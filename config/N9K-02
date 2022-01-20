@@ -1,0 +1,591 @@
+switchname N9K-02
+feature scp-server
+nv overlay evpn
+feature ospf
+feature bgp
+feature fabric forwarding
+feature interface-vlan
+feature vn-segment-vlan-based
+feature nv overlay
+feature ngoam
+logging level ngoam 5
+username admin password 0 cisco4ever!  role network-admin
+ssh key rsa 2048
+ip domain-lookup
+ip host N9K-01 172.16.100.120
+ip host N9K-02 172.18.100.120
+ip host N9K-03 172.20.100.120
+system default switchport
+copp profile strict
+rmon event 1 description FATAL(1) owner PMON@FATAL
+rmon event 2 description CRITICAL(2) owner PMON@CRITICAL
+rmon event 3 description ERROR(3) owner PMON@ERROR
+rmon event 4 description WARNING(4) owner PMON@WARNING
+rmon event 5 description INFORMATION(5) owner PMON@INFO
+fabric forwarding anycast-gateway-mac 0001.0001.0001
+vlan 1-8,397-401,793-797
+vlan 2
+  name L3VNI-TN10
+  vn-segment 100002
+vlan 3
+  name L2VNI-TN10-VLAN-3
+  vn-segment 100003
+vlan 4
+  name L2VNI-TN10-VLAN-4
+  vn-segment 100004
+vlan 5
+  name L2VNI-TN10-VLAN-5
+  vn-segment 100005
+vlan 6
+  name L2VNI-TN10-VLAN-6
+  vn-segment 100006
+vlan 7
+  name L2VNI-TN10-VLAN-7
+  vn-segment 100007
+vlan 8
+  name L2VNI-TN10-VLAN-8
+  vn-segment 100008
+vlan 397
+  name L3VNI-TN11
+  vn-segment 110397
+vlan 398
+  name L2VNI-TN11-VLAN-398
+  vn-segment 110398
+vlan 399
+  name L2VNI-TN11-VLAN-399
+  vn-segment 110399
+vlan 400
+  name L2VNI-TN11-VLAN-400
+  vn-segment 110400
+vlan 401
+  name L2VNI-TN11-VLAN-401
+  vn-segment 110401
+vlan 793
+  name L3VNI-TN12
+  vn-segment 120793
+vlan 794
+  name L2VNI-TN12-VLAN-794
+  vn-segment 120794
+vlan 795
+  name L2VNI-TN12-VLAN-795
+  vn-segment 120795
+vlan 796
+  name L2VNI-TN12-VLAN-796
+  vn-segment 120796
+vlan 797
+  name L2VNI-TN12-VLAN-797
+  vn-segment 120797
+ip prefix-list TN10 seq 10 permit 10.10.10.0/24
+ip prefix-list TN10 seq 20 permit 10.10.20.0/24
+ip prefix-list TN10 seq 30 permit 10.10.30.0/24
+ip prefix-list TN10 seq 40 permit 10.10.40.0/24
+ip prefix-list TN11 seq 10 permit 10.11.10.0/24
+ip prefix-list TN11 seq 20 permit 10.11.20.0/24
+ip prefix-list TN11 seq 30 permit 10.11.30.0/24
+ip prefix-list TN11 seq 40 permit 10.11.40.0/24
+ip prefix-list TN12 seq 10 permit 10.12.10.0/24
+ip prefix-list TN12 seq 20 permit 10.12.20.0/24
+ip prefix-list TN12 seq 30 permit 10.12.30.0/24
+ip prefix-list TN12 seq 40 permit 10.12.40.0/24
+route-map PERMIT-TN10 permit 10
+  match ip address prefix-list TN10
+route-map PERMIT-TN11 permit 10
+  match ip address prefix-list TN11
+route-map PERMIT-TN12 permit 10
+  match ip address prefix-list TN12
+vrf context TN10
+  vni 100002
+  ip route 0.0.0.0/0 Null0
+  rd auto
+  address-family ipv4 unicast
+    route-target both auto
+    route-target both auto evpn
+    route-target import 65000:110397
+    route-target import 65000:110397 evpn
+    route-target import 65000:120793
+    route-target import 65000:120793 evpn
+vrf context TN11
+  vni 110397
+  ip route 0.0.0.0/0 Null0
+  rd auto
+  address-family ipv4 unicast
+    route-target both auto
+    route-target both auto evpn
+    route-target import 65000:100002
+    route-target import 65000:100002 evpn
+vrf context TN12
+  vni 120793
+  ip route 0.0.0.0/0 Null0
+  rd auto
+  address-family ipv4 unicast
+    route-target both auto
+    route-target both auto evpn
+    route-target import 65000:100002
+    route-target import 65000:100002 evpn
+vrf context management
+  ip route 0.0.0.0/0 Null0
+hardware access-list tcam region ing-racl 0
+hardware access-list tcam region ing-sup 768
+ngoam loop-detection
+  periodic-probe-interval 200
+  port-recovery-interval 300
+interface Vlan1
+ description Disabled
+ shutdown
+interface Vlan2
+  description L3VNI-TN10
+  no shutdown
+  mtu 9216
+  vrf member TN10
+  ip forward
+interface Vlan3
+  description L2VNI-TN10-VLAN-3
+  no shutdown
+  mtu 9216
+  vrf member TN10
+  ip address 10.10.10.1/24
+  fabric forwarding mode anycast-gateway
+interface Vlan4
+  description L2VNI-TN10-VLAN-4
+  no shutdown
+  mtu 9216
+  vrf member TN10
+  ip address 10.10.20.1/24
+  fabric forwarding mode anycast-gateway
+interface Vlan5
+  description L2VNI-TN10-VLAN-5
+  no shutdown
+  mtu 9216
+  vrf member TN10
+  ip address 10.10.30.1/24
+  fabric forwarding mode anycast-gateway
+interface Vlan6
+  description L2VNI-TN10-VLAN-6
+  no shutdown
+  mtu 9216
+  vrf member TN10
+  ip address 10.10.40.1/24
+  fabric forwarding mode anycast-gateway
+interface Vlan397
+  description L3VNI-TN11
+  no shutdown
+  mtu 9216
+  vrf member TN11
+  ip forward
+interface Vlan398
+  description L2VNI-TN11-VLAN-398
+  no shutdown
+  mtu 9216
+  vrf member TN11
+  ip address 10.11.10.1/24
+  fabric forwarding mode anycast-gateway
+interface Vlan399
+  description L2VNI-TN11-VLAN-399
+  no shutdown
+  mtu 9216
+  vrf member TN11
+  ip address 10.11.20.1/24
+  fabric forwarding mode anycast-gateway
+interface Vlan400
+  description L2VNI-TN11-VLAN-400
+  no shutdown
+  mtu 9216
+  vrf member TN11
+  ip address 10.11.30.1/24
+  fabric forwarding mode anycast-gateway
+interface Vlan401
+  description L2VNI-TN11-VLAN-401
+  no shutdown
+  mtu 9216
+  vrf member TN11
+  ip address 10.11.40.1/24
+  fabric forwarding mode anycast-gateway
+interface Vlan793
+  description L3VNI-TN12
+  no shutdown
+  mtu 9216
+  vrf member TN12
+  ip forward
+interface Vlan794
+  description L2VNI-TN12-VLAN-794
+  no shutdown
+  mtu 9216
+  vrf member TN12
+  ip address 10.12.10.1/24
+  fabric forwarding mode anycast-gateway
+interface Vlan795
+  description L2VNI-TN12-VLAN-795
+  no shutdown
+  mtu 9216
+  vrf member TN12
+  ip address 10.12.20.1/24
+  fabric forwarding mode anycast-gateway
+interface Vlan796
+  description L2VNI-TN12-VLAN-796
+  no shutdown
+  mtu 9216
+  vrf member TN12
+  ip address 10.12.30.1/24
+  fabric forwarding mode anycast-gateway
+interface Vlan797
+  description L2VNI-TN12-VLAN-797
+  no shutdown
+  mtu 9216
+  vrf member TN12
+  ip address 10.12.40.1/24
+  fabric forwarding mode anycast-gateway
+interface nve1
+  no shutdown
+  host-reachability protocol bgp
+  source-interface loopback101
+  member vni 100002 associate-vrf
+  member vni 100003
+    suppress-arp
+    ingress-replication protocol bgp
+  member vni 100004
+    suppress-arp
+    ingress-replication protocol bgp
+  member vni 100005
+    suppress-arp
+    ingress-replication protocol bgp
+  member vni 100006
+    suppress-arp
+    ingress-replication protocol bgp
+  member vni 110397 associate-vrf
+  member vni 110398
+    suppress-arp
+    ingress-replication protocol bgp
+  member vni 110399
+    suppress-arp
+    ingress-replication protocol bgp
+  member vni 110400
+    suppress-arp
+    ingress-replication protocol bgp
+  member vni 110401
+    suppress-arp
+    ingress-replication protocol bgp
+  member vni 120793 associate-vrf
+  member vni 120794
+    suppress-arp
+    ingress-replication protocol bgp
+  member vni 120795
+    suppress-arp
+    ingress-replication protocol bgp
+  member vni 120796
+    suppress-arp
+    ingress-replication protocol bgp
+  member vni 120797
+    suppress-arp
+    ingress-replication protocol bgp
+interface Ethernet1/1
+  description L2VNI-TN10-VLAN-3
+  switchport access vlan 3
+  spanning-tree port type edge
+interface Ethernet1/2
+  description L2VNI-TN10-VLAN-4
+  switchport access vlan 4
+  spanning-tree port type edge
+interface Ethernet1/3
+  description L2VNI-TN11-VLAN-398
+  switchport access vlan 398
+  spanning-tree port type edge
+interface Ethernet1/4
+  description L2VNI-TN11-VLAN-399
+  switchport access vlan 399
+  spanning-tree port type edge
+interface Ethernet1/5
+  description L2VNI-TN12-VLAN-794
+  switchport access vlan 794
+  spanning-tree port type edge
+interface Ethernet1/6
+  description L2VNI-TN12-VLAN-795
+  switchport access vlan 795
+  spanning-tree port type edge
+interface Ethernet1/7
+  description Disabled
+  shutdown
+interface Ethernet1/8
+  description Disabled
+  shutdown
+interface Ethernet1/9
+  description Disabled
+  shutdown
+interface Ethernet1/10
+  description Disabled
+  shutdown
+interface Ethernet1/11
+  description Disabled
+  shutdown
+interface Ethernet1/12
+  description Disabled
+  shutdown
+interface Ethernet1/13
+  description Disabled
+  shutdown
+interface Ethernet1/14
+  description Disabled
+  shutdown
+interface Ethernet1/15
+  description Disabled
+  shutdown
+interface Ethernet1/16
+  description Disabled
+  shutdown
+interface Ethernet1/17
+  description Disabled
+  shutdown
+interface Ethernet1/18
+  description Disabled
+  shutdown
+interface Ethernet1/19
+  description Disabled
+  shutdown
+interface Ethernet1/20
+  description Disabled
+  shutdown
+interface Ethernet1/21
+  description Disabled
+  shutdown
+interface Ethernet1/22
+  description Disabled
+  shutdown
+interface Ethernet1/23
+  description Disabled
+  shutdown
+interface Ethernet1/24
+  description Disabled
+  shutdown
+interface Ethernet1/25
+  description Disabled
+  shutdown
+interface Ethernet1/26
+  description Disabled
+  shutdown
+interface Ethernet1/27
+  description Disabled
+  shutdown
+interface Ethernet1/28
+  description Disabled
+  shutdown
+interface Ethernet1/29
+  description Disabled
+  shutdown
+interface Ethernet1/30
+  description Disabled
+  shutdown
+interface Ethernet1/31
+  description Disabled
+  shutdown
+interface Ethernet1/32
+  description Disabled
+  shutdown
+interface Ethernet1/33
+  description Disabled
+  shutdown
+interface Ethernet1/34
+  description Disabled
+  shutdown
+interface Ethernet1/35
+  description Disabled
+  shutdown
+interface Ethernet1/36
+  description Disabled
+  shutdown
+interface Ethernet1/37
+  description Disabled
+  shutdown
+interface Ethernet1/38
+  description Disabled
+  shutdown
+interface Ethernet1/39
+  description Disabled
+  shutdown
+interface Ethernet1/40
+  description Disabled
+  shutdown
+interface Ethernet1/41
+  description Disabled
+  shutdown
+interface Ethernet1/42
+  description Disabled
+  shutdown
+interface Ethernet1/43
+  description Disabled
+  shutdown
+interface Ethernet1/44
+  description Disabled
+  shutdown
+interface Ethernet1/45
+  description Disabled
+  shutdown
+interface Ethernet1/46
+  description Disabled
+  shutdown
+interface Ethernet1/47
+  description Disabled
+  shutdown
+interface Ethernet1/48
+  description Disabled
+  shutdown
+interface Ethernet1/49
+  shutdown
+interface Ethernet1/50
+  shutdown
+interface Ethernet1/51
+  description N9K-01 Eth1/53
+  no switchport
+  mtu 9216
+  medium p2p
+  ip unnumbered loopback120
+  ip ospf network point-to-point
+  ip router ospf UNDERLAY-NET area 0.0.0.0
+  no shutdown
+interface Ethernet1/52
+  description N9K-01 Eth1/54
+  no switchport
+  mtu 9216
+  medium p2p
+  ip unnumbered loopback120
+  ip ospf network point-to-point
+  ip router ospf UNDERLAY-NET area 0.0.0.0
+  no shutdown
+interface Ethernet1/53
+  description N9K-03 Eth1/51
+  no switchport
+  mtu 9216
+  medium p2p
+  ip unnumbered loopback120
+  ip ospf network point-to-point
+  ip router ospf UNDERLAY-NET area 0.0.0.0
+  no shutdown
+interface Ethernet1/54
+  description N9K-03 Eth1/52
+  no switchport
+  mtu 9216
+  medium p2p
+  ip unnumbered loopback120
+  ip ospf network point-to-point
+  ip router ospf UNDERLAY-NET area 0.0.0.0
+  no shutdown
+interface mgmt0
+  vrf member management
+  ip address 10.128.16.101/24
+interface loopback10
+  description OAM-TN10
+  vrf member TN10
+  ip address 172.18.100.10/32
+interface loopback11
+  description OAM-TN11
+  vrf member TN11
+  ip address 172.18.100.11/32
+interface loopback12
+  description OAM-TN12
+  vrf member TN12
+  ip address 172.18.100.12/32
+interface loopback101
+  description VTEP_Overlay
+  ip address 172.18.100.101/32
+  ip router ospf UNDERLAY-NET area 0.0.0.0
+interface loopback120
+  description OSPF-RID_Underlay
+  ip address 172.18.100.120/32
+  ip router ospf UNDERLAY-NET area 0.0.0.0
+interface loopback130
+  description BGP-RID
+  ip address 172.18.100.130/32
+  ip router ospf UNDERLAY-NET area 0.0.0.0
+line console
+line vty
+boot nxos bootflash:/nxos.9.3.8.bin
+router ospf UNDERLAY-NET
+  router-id 172.18.100.120
+  name-lookup
+router bgp 65000
+  router-id 172.18.100.130
+  address-family ipv4 unicast
+  address-family l2vpn evpn
+  neighbor 172.16.100.130
+    remote-as 65000
+    description N9K-01
+    update-source loopback130
+    address-family l2vpn evpn
+      send-community extended
+  neighbor 172.20.100.130
+    remote-as 65000
+    description N9K-03
+    update-source loopback130
+    address-family l2vpn evpn
+      send-community extended
+  vrf TN10
+    address-family ipv4 unicast
+      advertise l2vpn evpn
+      redistribute direct route-map PERMIT-TN10
+      redistribute hmm route-map PERMIT-TN10
+  vrf TN11
+    address-family ipv4 unicast
+      advertise l2vpn evpn
+      redistribute direct route-map PERMIT-TN11
+      redistribute hmm route-map PERMIT-TN11
+  vrf TN12
+    address-family ipv4 unicast
+      advertise l2vpn evpn
+      redistribute direct route-map PERMIT-TN12
+      redistribute hmm route-map PERMIT-TN12
+evpn
+  vni 100003 l2
+    rd auto
+    route-target import auto
+    route-target export auto
+  vni 100004 l2
+    rd auto
+    route-target import auto
+    route-target export auto
+  vni 100005 l2
+    rd auto
+    route-target import auto
+    route-target export auto
+  vni 100006 l2
+    rd auto
+    route-target import auto
+    route-target export auto
+  vni 100007 l2
+    rd auto
+    route-target import auto
+    route-target export auto
+  vni 100008 l2
+    rd auto
+    route-target import auto
+    route-target export auto
+  vni 110398 l2
+    rd auto
+    route-target import auto
+    route-target export auto
+  vni 110399 l2
+    rd auto
+    route-target import auto
+    route-target export auto
+  vni 110400 l2
+    rd auto
+    route-target import auto
+    route-target export auto
+  vni 110401 l2
+    rd auto
+    route-target import auto
+    route-target export auto
+  vni 120794 l2
+    rd auto
+    route-target import auto
+    route-target export auto
+  vni 120795 l2
+    rd auto
+    route-target import auto
+    route-target export auto
+  vni 120796 l2
+    rd auto
+    route-target import auto
+    route-target export auto
+  vni 120797 l2
+    rd auto
+    route-target import auto
+    route-target export auto
+no system default switchport shutdown
