@@ -3,4 +3,3 @@ virl2_client
 ciscoconfparse
 alive_progress
 pyats[full]
-test
