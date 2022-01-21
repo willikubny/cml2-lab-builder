@@ -62,12 +62,12 @@ def task_title(title):
     Prints the Task title to shell
     """
     # Get shell window width and height
-    (shell_width, shell_height) = os.get_terminal_size()
+    terminal_size = os.get_terminal_size()
     # Get length of the Task heading string
     heading = f'TASK [{title}]'
     heading_length = (len(heading))
     # Get a terminal wide asterisk line minus the length of the heading length
-    asterisk_line = ((shell_width - heading_length) * '*')
+    asterisk_line = ((terminal_size.columns - heading_length) * '*')
     # Print the heading followed by the aserisk line to shell
     bold = '\033[1m'
     bold_end = '\033[0m'
