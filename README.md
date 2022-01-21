@@ -1,5 +1,7 @@
 # CML2 Lab Builder
 
+[![published](https://static.production.devnetcloud.com/codeexchange/assets/images/devnet-published.svg)](https://developer.cisco.com/codeexchange/github/repo/willikubny/cml2_lab_builder)
+
 The script helps to automate the initial CML2 lab building process by creating the topology with all its nodes and links. Optional the script can apply the day 0 configuration to each node before the nodes get started.
 When the script is executed with the day 0 configuration, then also a pyATS testbed will be created after all CML2 nodes are booted. There are several modifications for the day0 configuration and the pyATS testbed which the script does. These modifications are described later.
 
@@ -377,7 +379,7 @@ Node: N9K-03                ID: n2          State: BOOTED      CPU: 15.2%
 
 ## Additional Information
 
-The script was developed without only with static code analysis and functional testing.
+The script was developed only with static code analysis and functional testing.
 
 ## Open Points
 
