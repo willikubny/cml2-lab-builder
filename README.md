@@ -379,7 +379,7 @@ Node: N9K-03                ID: n2          State: BOOTED      CPU: 15.2%
 
 ## Additional Information
 
-The script was developed without only with static code analysis and functional testing.
+The script was developed only with static code analysis and functional testing.
 
 ## Open Points
 
