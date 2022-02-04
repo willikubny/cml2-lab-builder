@@ -542,7 +542,7 @@ if args.day0:
 
             # 4. Apply further interface modifications here:
 
-            # Save the modified config to new file
+            # 5. Save the modified config to new file
             parse.save_as(f'config/day0_{host}')
 
             # Print the result to stdout
