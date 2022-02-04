@@ -21,7 +21,7 @@ from genie import testbed
 
 
 __author__ = 'Willi Kubny'
-__version__ = '1.0'
+__version__ = '1.1'
 
 
 # Start the lab build timer
