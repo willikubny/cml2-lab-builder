@@ -80,10 +80,10 @@ def task_ok(message, hostname=None):
     """
     green = '\033[92m'
     green_end = '\033[0m'
-    if hostname is None:
-        print(f'{green}OK: [{message}]{green_end}')
-    else:
+    if hostname:
         print(f'{green}OK: [{hostname}: {message}]{green_end}')
+    else:
+        print(f'{green}OK: [{message}]{green_end}')
 
 
 def task_failed(message, hostname=None):
@@ -92,10 +92,10 @@ def task_failed(message, hostname=None):
     """
     red = '\033[91m'
     red_end = '\033[0m'
-    if hostname is None:
-        print(f'{red}Failed: [{message}]{red_end}')
-    else:
+    if hostname:
         print(f'{red}Failed: [{hostname}: {message}]{red_end}')
+    else:
+        print(f'{red}Failed: [{message}]{red_end}')
 
 
 def task_debug(message, hostname=None):
@@ -104,10 +104,10 @@ def task_debug(message, hostname=None):
     """
     cyan = '\033[96m'
     cyan_end = '\033[0m'
-    if hostname is None:
-        print(f'{cyan}Debug:\n{message}{cyan_end}')
-    else:
+    if hostname:
         print(f'{cyan}Debug: [{hostname}]\n{message}{cyan_end}')
+    else:
+        print(f'{cyan}Debug:\n{message}{cyan_end}')
 
 
 def read_yaml_to_var(file_path):
@@ -245,6 +245,10 @@ try:
             hosts_dict[host]['data']['cml_position'][1]
         )
 
+        # Create with globals() the hostname as variable without dashes
+        # This serves as a host specific interface counter when creating links
+        globals()[host.replace('-', '')] = 1
+
         # Print the result to stdout
         task_ok('Created node', host)
 
@@ -260,11 +264,6 @@ except HTTPError as err:
 
 # Loop over all links in inventory/links.yaml and create links
 try:
-    # Loop over all hosts and create a host link slot counter
-    for host in hosts_dict:
-        # Create with globals() the hostname as variable without dashes
-        globals()[host.replace('-', '')] = 1
-
     # The link ID will later be used to map the generated links by cml
     link_id = 0
 
@@ -280,7 +279,7 @@ try:
                 # With this the mgmt0 interface won't be used as the first interface
                 node_a_i1 = lab.create_interface(node_a, globals()[host.replace('-', '')])
 
-                # Increase the hosts link slot count
+                # Increase the host specific interface counter
                 globals()[host.replace('-', '')] += 1
 
         for host in hosts_dict:
@@ -289,7 +288,7 @@ try:
                 # With this the mgmt0 interface won't be used as the first interface
                 node_b_i1 = lab.create_interface(node_b, globals()[host.replace('-', '')])
 
-                # Increase the hosts link slot count
+                # Increase the host specific interface counter
                 globals()[host.replace('-', '')] += 1
 
         # Create the link between both node objects
@@ -548,7 +547,6 @@ if args.day0:
 
             # Print the result to stdout
             task_ok(f'Created temporary day 0 configuration file config/day0_{host}', host)
-            print('\n')
 
     except FileNotFoundError as err:
         # Print the result to stdout
@@ -585,7 +583,6 @@ if args.day0:
 
             # Print the result to stdout
             task_ok(f'Deleted temporary day 0 configuration file config/day0_{host}', host)
-            print('\n')
 
     except FileNotFoundError as err:
         # Print the result to stdout
@@ -658,8 +655,11 @@ if args.day0:
     if args.debug:
         task_debug(json.dumps(
             testbed_loaded['devices']['terminal_server'], sort_keys=True, indent=4
-            ), host
+            ), cml_server
         )
+
+    # Print the result to std-out
+    task_ok('Modified devices default credentials for the user cmladmin', cml_server)
 
     # Changes for each node in the testbed
     for node in testbed_loaded['devices']:
@@ -676,11 +676,8 @@ if args.day0:
             if args.debug:
                 task_debug(json.dumps(
                     testbed_loaded['devices'][node], sort_keys=True, indent=4
-                    ), host
+                    ), node
                 )
-
-    # Print the result to std-out
-    task_ok('Modified devices default credentials for the user cmladmin', cml_server)
 
     # Write the modified pyATS testbed to a file
     with open(f'inventory/pyats_testbed_{lab.id}.yaml', 'w', encoding='utf-8') as stream:
@@ -762,6 +759,7 @@ if args.day0:
 
 # Print some details about the created CML2 lab
 print_colored(
+    f'\n'
     f'Title: {lab.title:<22}'
     f'ID: {lab.id:<12}'
     f'URL: {lab.lab_base_url}\n', 'green'
