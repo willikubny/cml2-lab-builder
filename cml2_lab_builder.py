@@ -167,19 +167,22 @@ argparser = argparse.ArgumentParser(
 )
 # Add a script parser argument
 argparser.add_argument('--day0', help='Optional: Enable day 0 configuration', required=False)
-argparser.add_argument('--debug', help='Optional: Enable stdout debug print.', required=False)
+argparser.add_argument('--oob', help='Optional: Create an OOB VRF with external connection', required=False)
+argparser.add_argument('--debug', help='Optional: Enable stdout debug print', required=False)
 
 # Parse the script arguments
 args = argparser.parse_args()
 
 # If the --day0 argument is set, verify that the argument is "enable"
-if args.day0 is not None:
-    if args.day0 != 'enable':
+if args.day0 and (args.day0 != 'enable'):
         argparser.error('For argument --day0 please specify "enable".')
 
+# If the --oob argument is set, verify that the argument is "enable"
+if args.oob and (args.oob != 'enable'):
+        argparser.error('For argument --oob please specify "enable".')
+
 # If the --debug argument is set, verify that the argument is "enable"
-if args.debug is not None:
-    if args.debug != 'enable':
+if args.debug and (args.debug != 'enable'):
         argparser.error('For argument --debug please specify "enable".')
 
 # Print the task title
@@ -235,6 +238,42 @@ if args.debug:
 # Print the task title
 task_title(f'Setup CML2 Lab ID {lab.id}')
 
+# Prepare the hosts dictionary with nodes for the OOB network
+if args.oob:
+    # Add an unmanaged switch for OOB access to the topology
+    hosts_dict['SW-OOB'] = {}
+    hosts_dict['SW-OOB']['data'] = {}
+    hosts_dict['SW-OOB']['data']['cml_label'] = 'SW-OOB'
+    hosts_dict['SW-OOB']['data']['cml_platform'] = 'unmanaged_switch'
+    hosts_dict['SW-OOB']['data']['cml_position'] = [-800, 0]
+
+    # Create a variable for the unmanaged switch hostname
+    unmanaged_switch = hosts_dict['SW-OOB']['data']['cml_label']
+
+    # Print the result to stdout
+    task_ok('Created node', hosts_dict['SW-OOB']['data']['cml_label'])
+
+    # Uncomment for details. Dump the modified dictionary to stdout
+    if args.debug:
+        task_debug(json.dumps(hosts_dict['SW-OOB'], sort_keys=True, indent=4))
+
+    # Add an external connector for OOB access to the topology
+    hosts_dict['EXT-CONN'] = {}
+    hosts_dict['EXT-CONN']['data'] = {}
+    hosts_dict['EXT-CONN']['data']['cml_label'] = 'EXT-CONN'
+    hosts_dict['EXT-CONN']['data']['cml_platform'] = 'external_connector'
+    hosts_dict['EXT-CONN']['data']['cml_position'] = [-1000, 0]
+
+    # Create a variable for the external connector hostname
+    external_connector = hosts_dict['EXT-CONN']['data']['cml_label']
+
+    # Print the result to stdout
+    task_ok('Created node', hosts_dict['SW-OOB']['data']['cml_label'])
+
+    # Uncomment for details. Dump the modified dictionary to stdout
+    if args.debug:
+        task_debug(json.dumps(hosts_dict['EXT-CONN'], sort_keys=True, indent=4))
+
 # Loop over all hosts in inventory/hosts.yaml and create nodes
 try:
     for host in hosts_dict:
@@ -254,13 +293,35 @@ try:
 
         # Uncomment for details. Dump the modified dictionary to stdout
         if args.debug:
-            task_debug(json.dumps(host, sort_keys=True, indent=4))
+            task_debug(json.dumps(hosts_dict[host]['data'], sort_keys=True, indent=4))
 
 except HTTPError as err:
     # Print the result to stdout
     task_failed(f'{err}', host)
     remove_lab(lab)
     sys.exit()
+
+# Prepare the links dictionary with links for the OOB network
+if args.oob:
+    for host in hosts_dict:
+        if host in external_connector:
+            # Create with globals() the hostname as variable without dashes
+            # This serves as a host specific interface counter for the external connector
+            globals()[host.replace('-', '')] = 0
+
+        # Exclute the unmanaged switch and the external connector to not connect each
+        # node to the unmanaged switch but not to itself
+        if host not in (unmanaged_switch or external_connector):
+            # Create a dictionary with the link for each host to the unmanaged switch
+            oob_link = {'host_a' : host, 'host_b' : unmanaged_switch}
+
+            # Insert the dictionary to the list of links as the first element
+            # The first links are the OOB links followed by the regular node links
+            link_dict['link_list'].insert(0, oob_link)
+
+    # Uncomment for details. Dump the modified dictionary to stdout
+    if args.debug:
+        task_debug(json.dumps(link_dict, sort_keys=True, indent=4))
 
 # Loop over all links in inventory/links.yaml and create links
 try:
@@ -342,6 +403,32 @@ for cml_link in lab.links():
             if args.debug:
                 task_debug(json.dumps(link, sort_keys=True, indent=4))
 
+if args.oob:
+    # Clean-up to continue the script properly for all argument variations
+    # Copy link_dict dictionary
+    oob_link_dict = link_dict.copy()
+
+    # List comprehension to have only the OOB links in the dictionary
+    oob_link_dict['link_list'] = [i for i in oob_link_dict['link_list'] if not ((i['host_b'] or i['host_b']) != unmanaged_switch)]
+
+    # Clean-Up link_dict dictionary and remove all OOB network links
+    link_dict['link_list'] = [i for i in link_dict['link_list'] if not ((i['host_a'] and i['host_b']) == unmanaged_switch)]
+
+    # Delete the unmanaged switch and the external connector from the hosts_dict
+    del hosts_dict['SW-OOB']
+    del hosts_dict['EXT-CONN']
+
+if args.oob:
+    # Use globals() to set the variable name to the hostname without
+    # any dash and create a node object by finding the node by its label
+    print(external_connector)
+    globals()[host.replace('-', '')] = lab.get_node_by_label(external_connector)
+
+    # Set the external connector mode
+    # .config expects a string
+    globals()[host.replace('-', '')].config = 'bridge0'
+
+
 if args.day0:
     # Print the task title
     task_title(f'Prepare Day 0 Configuration for Lab ID {lab.id}')
@@ -422,7 +509,6 @@ if args.day0:
             for link in link_dict['link_list']:
                 # Check if the host in the link iteration matches with the host in the
                 # host iteration and set the variables to select only correct links.
-
                 if host == [link][0]['host_a']:
                     # Setup all variables for host_a
                     interface_a = [link][0]['interface_a']
