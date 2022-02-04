@@ -229,11 +229,18 @@ hosts_dict = read_yaml_to_var('inventory/hosts.yaml')
 if args.debug:
     task_debug(json.dumps(hosts_dict, sort_keys=True, indent=4))
 
-# Read the inventory/links.yaml file into a variable as list
+# Read the inventory/links.yaml file into a variable as dictionary
 link_dict = read_yaml_to_var('inventory/links.yaml')
 # Uncomment for details. Dump the modified dictionary to stdout
 if args.debug:
     task_debug(json.dumps(link_dict, sort_keys=True, indent=4))
+
+if args.oob:
+    # Read the inventory/oob.yaml file into a variable as dictionary
+    oob_var_dict = read_yaml_to_var('inventory/oob.yaml')
+    # Uncomment for details. Dump the modified dictionary to stdout
+    if args.debug:
+        task_debug(json.dumps(oob_var_dict, sort_keys=True, indent=4))
 
 # Print the task title
 task_title(f'Setup CML2 Lab ID {lab.id}')
@@ -250,13 +257,6 @@ if args.oob:
     # Create a variable for the unmanaged switch hostname
     unmanaged_switch = hosts_dict['SW-OOB']['data']['cml_label']
 
-    # Print the result to stdout
-    task_ok('Created node', hosts_dict['SW-OOB']['data']['cml_label'])
-
-    # Uncomment for details. Dump the modified dictionary to stdout
-    if args.debug:
-        task_debug(json.dumps(hosts_dict['SW-OOB'], sort_keys=True, indent=4))
-
     # Add an external connector for OOB access to the topology
     hosts_dict['EXT-CONN'] = {}
     hosts_dict['EXT-CONN']['data'] = {}
@@ -266,13 +266,6 @@ if args.oob:
 
     # Create a variable for the external connector hostname
     external_connector = hosts_dict['EXT-CONN']['data']['cml_label']
-
-    # Print the result to stdout
-    task_ok('Created node', hosts_dict['SW-OOB']['data']['cml_label'])
-
-    # Uncomment for details. Dump the modified dictionary to stdout
-    if args.debug:
-        task_debug(json.dumps(hosts_dict['EXT-CONN'], sort_keys=True, indent=4))
 
 # Loop over all hosts in inventory/hosts.yaml and create nodes
 try:
@@ -318,10 +311,6 @@ if args.oob:
             # Insert the dictionary to the list of links as the first element
             # The first links are the OOB links followed by the regular node links
             link_dict['link_list'].insert(0, oob_link)
-
-    # Uncomment for details. Dump the modified dictionary to stdout
-    if args.debug:
-        task_debug(json.dumps(link_dict, sort_keys=True, indent=4))
 
 # Loop over all links in inventory/links.yaml and create links
 try:
@@ -418,21 +407,11 @@ if args.oob:
     del hosts_dict['SW-OOB']
     del hosts_dict['EXT-CONN']
 
-if args.oob:
-    # Use globals() to set the variable name to the hostname without
-    # any dash and create a node object by finding the node by its label
-    print(external_connector)
-    globals()[host.replace('-', '')] = lab.get_node_by_label(external_connector)
-
-    # Set the external connector mode
-    # .config expects a string
-    globals()[host.replace('-', '')].config = 'bridge0'
-
+if (args.day0 and args.oob) or (args.day0 or args.oob):
+    # Print the task title
+    task_title(f'Prepare Node Configuration for Lab ID {lab.id}')
 
 if args.day0:
-    # Print the task title
-    task_title(f'Prepare Day 0 Configuration for Lab ID {lab.id}')
-
     try:
         # Loop over all hosts in inventory/hosts.yaml to modify the configuration stored
         # in the /config directory. Then write the day 0 config to a temporary file.
@@ -443,14 +422,14 @@ if args.day0:
             # Print the result to stdout
             task_ok(f'Start parsing config/{host} configuration file', host)
 
-            # 1. Apply all general configuration modifications here:
+            # Apply all general configuration modifications here:
 
             all_general_changes = []
 
             # nexusv9000, nxosv
             # Finds the first line which start with username
             if parse.has_line_with(r'^username.*role.*'):
-                # prepend_line() adds a line at the top of the configuration
+                # append_line() adds a line at the bottom of the configuration
                 # Add a new cmladmin user
                 nexus_cml_user = parse.append_line(
                     'username cmladmin password 0 cisco4ever! role network-admin'
@@ -463,7 +442,7 @@ if args.day0:
             # iosv, iosvl2
             # Finds the first line which start with username
             if parse.has_line_with(r'^username (\S+) privilege'):
-                # prepend_line() adds a line at the top of the configuration
+                # append_line() adds a line at the bottom of the configuration
                 # Add a new cmladmin user
                 ios_cml_user = parse.append_line(
                     'username cmladmin privilege 15 secret 0 cisco4ever!'
@@ -480,7 +459,7 @@ if args.day0:
                 r'secret.*$',
                 r'secret 0 cisco4ever!'
             )
-            all_general_changes.extend(ios_changed_enable_secret)
+            all_general_changes.append(ios_changed_enable_secret)
 
             # Change enable password to cisco4ever!
             ios_changed_enable_pw = conf_parse_replace_lines_with_regex(
@@ -489,13 +468,10 @@ if args.day0:
                 r'password.*$',
                 r'secret 0 cisco4ever!'
             )
-            all_general_changes.extend(ios_changed_enable_pw)
+            all_general_changes.append(ios_changed_enable_pw)
 
             # Print the result to stdout
-            task_ok(
-                'Applied general day 0 configuration modifications',
-                host
-            )
+            task_ok('Applied general node configuration modifications', host)
 
             # Uncomment for details. Dump the modified dictionary to stdout
             if args.debug:
@@ -626,13 +602,14 @@ if args.day0:
             if args.debug:
                 task_debug(json.dumps(all_changed_interfaces, sort_keys=True, indent=4), host)
 
-            # 4. Apply further interface modifications here:
+            # Apply further interface modifications here:
 
-            # 5. Save the modified config to new file
-            parse.save_as(f'config/day0_{host}')
+            # Save the modified config to file
+            parse.save_as(f'config/cml2_{host}')
 
-            # Print the result to stdout
-            task_ok(f'Created temporary day 0 configuration file config/day0_{host}', host)
+            if not args.oob:
+                # Print the result to stdout
+                task_ok(f'Created temporary node configuration file config/cml2_{host}', host)
 
     except FileNotFoundError as err:
         # Print the result to stdout
@@ -640,9 +617,93 @@ if args.day0:
         remove_lab(lab)
         sys.exit()
 
-    # Print the task title
-    task_title(f'Apply Day 0 Configuration for Lab ID {lab.id}')
+if args.oob:
+    # Create OOB Configuration
+    try:
+        # Loop over all hosts in inventory/hosts.yaml to create the OOB configuration
+        for host in hosts_dict:
+            # If the host configuration file exists
+            if not os.path.exists(f'config/cml2_{host}'):
+                # Create a new host configuration file
+                open(f'config/cml2_{host}', 'a').close()
 
+                # Print the result to stdout
+                task_ok('Created empty node configuration file', host)
+
+                # Print the result to stdout
+                task_ok(f'Start editing config/cml2_{host} configuration file', host)
+
+            # Create the CiscoConfParse object
+            parse = CiscoConfParse(f'config/cml2_{host}')
+
+            all_oob_changes = []
+
+            # OOB configuration
+            oob_config = [
+                f'hostname {host}',
+                '!',
+                f'vrf definition {oob_var_dict['oob_vrf_name']}',
+                f' description {oob_var_dict['oob_vrf_description']}',
+                '!',
+                f'vlan {oob_var_dict['oob_vlan_number']}',
+                f' description {oob_var_dict['oob_vlan_name']}',
+                '!'
+            ]
+
+            # Loop over the list of configuration lines
+            for line in oob_config:
+                # append_line() adds a line at the bottom of the configuration
+                config_line = parse.append_line(line)
+                all_oob_changes.append(config_line.text)
+
+            # Commit changes to the parser
+            parse.commit()
+
+            # Create VLAN
+            print('Create VLAN')
+
+            # Create SVI
+            print('Create SVI')
+
+            # Configure OOB Interface
+            print('Configure OOB Interface')
+
+            # Print the result to stdout
+            task_ok('Created oob node configuration', host)
+
+            # Uncomment for details. Dump the modified dictionary to stdout
+            if args.debug:
+                task_debug(json.dumps(all_oob_changes, sort_keys=True, indent=4), host)
+
+            # Save the modified config to file
+            parse.save_as(f'config/cml2_{host}')
+
+            # Print the result to stdout
+            task_ok(f'Created temporary node configuration file config/cml2_{host}', host)
+
+    except FileNotFoundError as err:
+        # Print the result to stdout
+        task_failed(f'{err}', host)
+        remove_lab(lab)
+        sys.exit()
+
+if (args.day0 and args.oob) or (args.day0 or args.oob):
+    # Print the task title
+    task_title(f'Apply Node Configuration for Lab ID {lab.id}')
+
+if args.oob:
+    # Use globals() to set the variable name to the hostname without
+    # any dash and create a node object by finding the node by its label
+    globals()[host.replace('-', '')] = lab.get_node_by_label(external_connector)
+
+    # Set the external connector mode
+    # .config expects a string
+    globals()[host.replace('-', '')].config = 'bridge0'
+
+    # Print the result to stdout
+    task_ok('Applied node configuration', external_connector)
+
+if (args.day0 and args.oob) or (args.day0 or args.oob):
     # Loop over all hosts in inventory/hosts.yaml and apply the new created day 0 configuration
     try:
         for host in hosts_dict:
@@ -651,7 +712,7 @@ if args.day0:
             globals()[host.replace('-', '')] = lab.get_node_by_label(host)
 
             # Read new day 0 config file line by line into a list of strings
-            with open(f'config/day0_{host}', 'r', encoding='utf-8') as stream:
+            with open(f'config/cml2_{host}', 'r', encoding='utf-8') as stream:
                 config_line_list = stream.readlines()
 
             # Construct from the list of strings a string with multiple lines
@@ -662,13 +723,13 @@ if args.day0:
             globals()[host.replace('-', '')].config = config_line_string
 
             # Print the result to stdout
-            task_ok('Applied day 0 configuration to node', host)
+            task_ok('Applied node configuration', host)
 
             # Delete the pyATS testbed file from the filesystem
-            os.remove(f'config/day0_{host}')
+            os.remove(f'config/cml2_{host}')
 
             # Print the result to stdout
-            task_ok(f'Deleted temporary day 0 configuration file config/day0_{host}', host)
+            task_ok(f'Deleted temporary node configuration file config/cml2_{host}', host)
 
     except FileNotFoundError as err:
         # Print the result to stdout

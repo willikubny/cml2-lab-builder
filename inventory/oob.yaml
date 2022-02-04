@@ -1,0 +1,9 @@
+---
+# OOB network configuration file
+
+oob_vrf_name: cml2_oob
+oob_vrf_description: CML2-OOB
+oob_vlan_number: 100
+oob_vlan_name: cml2_oob
+oob_vlan_svi_subnet: 192.168.0.0
+oob_vlan_svi_mask: 255.255.255.0
