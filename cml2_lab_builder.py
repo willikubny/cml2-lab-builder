@@ -636,37 +636,54 @@ if args.oob:
             # Create the CiscoConfParse object
             parse = CiscoConfParse(f'config/cml2_{host}')
 
+            # Create all needed variables for the host iteration
+            oob_vlan_number = oob_var_dict['oob_vlan_number']
+            oob_vlan_subnet = oob_var_dict['oob_vlan_subnet']
+            oob_vlan_mask = oob_var_dict['oob_vlan_mask']
+            oob_vlan_gateway = oob_var_dict['oob_vlan_gateway']
+
+            node_platform = hosts_dict[host]['data']['cml_platform']
+            oob_interface = 'Ethernet1/1'
+
             all_oob_changes = []
 
             # OOB configuration
-            oob_config = [
-                f'hostname {host}',
-                '!',
-                f'vrf definition {oob_var_dict['oob_vrf_name']}',
-                f' description {oob_var_dict['oob_vrf_description']}',
-                '!',
-                f'vlan {oob_var_dict['oob_vlan_number']}',
-                f' description {oob_var_dict['oob_vlan_name']}',
-                '!'
-            ]
+            if node_platform == ('nxosv9000' or 'nxosv'):
+                oob_config = [
+                    f'hostname {host}',
+                    '!',
+                    'feature interface-vlan',
+                    '!',
+                    'vrf definition CML2-OOB',
+                    ' description CML2-OOB',
+                    '!',
+                    f'vlan {oob_vlan_number}',
+                    ' name CML2-OOB',
+                    '!',
+                    f'interface vlan {oob_vlan_number}',
+                    ' vrf member CML2-OOB',
+                    ' description CML2-OOB',
+                    f' ip address {oob_vlan_gateway} {oob_vlan_mask}',
+                    ' no shutdown',
+                    '!',
+                    f'interface {oob_interface}',
+                    ' switchport',
+                    f' switchport access vlan {oob_vlan_number}',
+                    ' spanning-tree port type edge',
+                    ' no shutdown',
+                    '!',
+                    f'ip route 0.0.0.0 0.0.0.0 {oob_vlan_gateway} vrf CML2-OOB',
+                    '!'
+                ]
 
-            # Loop over the list of configuration lines
-            for line in oob_config:
-                # append_line() adds a line at the bottom of the configuration
-                config_line = parse.append_line(line)
-                all_oob_changes.append(config_line.text)
+                # Loop over the list of configuration lines
+                for line in oob_config:
+                    # append_line() adds a line at the bottom of the configuration
+                    config_line = parse.append_line(line)
+                    all_oob_changes.append(config_line.text)
 
             # Commit changes to the parser
             parse.commit()
-
-            # Create VLAN
-            print('Create VLAN')
-
-            # Create SVI
-            print('Create SVI')
-
-            # Configure OOB Interface
-            print('Configure OOB Interface')
 
             # Print the result to stdout
             task_ok('Created oob node configuration', host)
