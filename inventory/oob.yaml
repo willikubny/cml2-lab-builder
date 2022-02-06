@@ -2,6 +2,5 @@
 # OOB network configuration file
 
 oob_vlan_number: 100
-oob_vlan_subnet: 192.168.0.0
-oob_vlan_mask: 255.255.255.0
-oob_vlan_gateway: 192.168.0.1
+oob_vlan_subnet: 192.168.1.0/24
+oob_vlan_gateway: 192.168.1.1

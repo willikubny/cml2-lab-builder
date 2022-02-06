@@ -12,6 +12,7 @@ import argparse
 import timeit
 import json
 import yaml
+import ipaddress
 from virl2_client import ClientLibrary
 from virl2_client import exceptions
 from requests.exceptions import HTTPError
@@ -117,13 +118,13 @@ def read_yaml_to_var(file_path):
     try:
         with open(file_path, 'r', encoding='utf-8') as stream:
             yaml_var = yaml.safe_load(stream)
-        task_ok(f'Loaded file {file_path}', cml_server)
+        task_ok(f'Loaded file {file_path}', 'CML2')
     except yaml.parser.ParserError as err:
-        task_failed(f'{err}', cml_server)
+        task_failed(f'{err}', 'CML2')
         remove_lab(lab)
         sys.exit()
     except FileNotFoundError as err:
-        task_failed(f'{err}', cml_server)
+        task_failed(f'{err}', 'CML2')
         remove_lab(lab)
         sys.exit()
 
@@ -137,7 +138,7 @@ def remove_lab(lab_object):
     lab_object.stop()
     lab_object.wipe()
     lab_object.remove()
-    task_ok(f'Deleted lab ID {lab.id}', cml_server)
+    task_ok(f'Deleted lab ID {lab.id}', 'CML2')
 
 
 def conf_parse_replace_lines_with_regex(parser, find, match, replace):
@@ -216,11 +217,11 @@ try:
     lab.title = f'Lab_ID_{lab.id}'
 
     # Print the result to stdout
-    task_ok('Initialized CML2 server connection', cml_server)
-    task_ok(f'Created lab ID {lab.id}', cml_server)
+    task_ok('Initialized CML2 server connection', 'CML2')
+    task_ok(f'Created lab ID {lab.id}', 'CML2')
 
 except HTTPError as err:
-    task_failed(f'{err}', cml_server)
+    task_failed(f'{err}', 'CML2')
     sys.exit()
 
 # Read the inventory/hosts.yaml file into a variable as dictionary
@@ -618,6 +619,45 @@ if args.day0:
         sys.exit()
 
 if args.oob:
+    # Create the OOB network and verify its a correct network address and subnet mask
+    try:
+        oob_vlan_subnet = ipaddress.ip_network(oob_var_dict['oob_vlan_subnet'])
+
+    except ValueError as err:
+        # Print the result to stdout
+        task_failed(f'OOB network {err}', 'CML2')
+        remove_lab(lab)
+        sys.exit()
+
+    # Create the OOB default-gateway and verify its a correct IP-Address
+    try:
+        oob_vlan_gateway = ipaddress.ip_address(oob_var_dict['oob_vlan_gateway'])
+
+    except ValueError as err:
+        # Print the result to stdout
+        task_failed(f'OOB IP-Address {err}', 'CML2')
+        remove_lab(lab)
+        sys.exit()
+
+    # Verify that the default-gateway is in the OOB vlan host ip range
+    if oob_vlan_gateway in ipaddress.ip_network(oob_var_dict['oob_vlan_subnet']):
+        pass
+    else:
+        # Print the result to stdout
+        task_failed(f'Default-Gateway {oob_vlan_gateway} is not in OOB Vlan {oob_vlan_subnet}', 'CML2')
+        remove_lab(lab)
+        sys.exit()
+
+    # Create the OOB vlan number and verify the vlan tag is between 1 and 4094
+    oob_vlan_number = oob_var_dict['oob_vlan_number']
+    if 1 <= oob_vlan_number <= 4094:
+        pass
+    else:
+        # Print the result to stdout
+        task_failed(f'OOB VLAN number {oob_vlan_number} is not between 1 and 4094', 'CML2')
+        remove_lab(lab)
+        sys.exit()
+
     # Create OOB Configuration
     try:
         # Loop over all hosts in inventory/hosts.yaml to create the OOB configuration
@@ -633,14 +673,18 @@ if args.oob:
                 # Print the result to stdout
                 task_ok(f'Start editing config/cml2_{host} configuration file', host)
 
+            # Search the first tree IP-Adress to assign to the node
+            for ip in oob_vlan_subnet.hosts():
+                if ip == oob_vlan_gateway:
+                    print(ip)
+                    pass
+                else:
+                    oob_ip = ip
+                    print(f'First free IP-Address is {ip}')
+                    break
+
             # Create the CiscoConfParse object
             parse = CiscoConfParse(f'config/cml2_{host}')
-
-            # Create all needed variables for the host iteration
-            oob_vlan_number = oob_var_dict['oob_vlan_number']
-            oob_vlan_subnet = oob_var_dict['oob_vlan_subnet']
-            oob_vlan_mask = oob_var_dict['oob_vlan_mask']
-            oob_vlan_gateway = oob_var_dict['oob_vlan_gateway']
 
             node_platform = hosts_dict[host]['data']['cml_platform']
             oob_interface = 'Ethernet1/1'
@@ -663,7 +707,7 @@ if args.oob:
                     f'interface vlan {oob_vlan_number}',
                     ' vrf member CML2-OOB',
                     ' description CML2-OOB',
-                    f' ip address {oob_vlan_gateway} {oob_vlan_mask}',
+                    f' ip address {oob_ip} {oob_vlan_subnet.netmask}',
                     ' no shutdown',
                     '!',
                     f'interface {oob_interface}',
@@ -713,7 +757,7 @@ if args.oob:
     # any dash and create a node object by finding the node by its label
     globals()[host.replace('-', '')] = lab.get_node_by_label(external_connector)
 
-    # Set the external connector mode
+    # Set the external connector mode to bridge0
     # .config expects a string
     globals()[host.replace('-', '')].config = 'bridge0'
 
@@ -772,12 +816,12 @@ try:
     sys.stdout.write('\033[0m')
 
     # Print the result to stdout
-    task_ok(f'Started CML2 lab {lab.title} - ID {lab.id}', cml_server)
+    task_ok(f'Started CML2 lab {lab.title} - ID {lab.id}', 'CML2')
 
 except:
     print('\n')
     # Print the result to stdout
-    task_failed(f'Lab ID {lab.id} could not be started', cml_server)
+    task_failed(f'Lab ID {lab.id} could not be started', 'CML2')
     remove_lab(lab)
     sys.exit()
 
@@ -795,7 +839,7 @@ if args.day0:
     testbed_generated = lab.get_pyats_testbed()
 
     # Print the result to std-out
-    task_ok('Generated temporary pyATS testbed on CML2 server', cml_server)
+    task_ok('Generated temporary pyATS testbed on CML2 server', 'CML2')
 
     # Write the generated pyATS testbed to a temporary file
     with open(f'inventory/tmp_pyats_testbed_{lab.id}.yaml', 'w', encoding='utf-8') as stream:
@@ -806,24 +850,24 @@ if args.day0:
         testbed_loaded = yaml.safe_load(stream)
 
     # Print the result to std-out
-    task_ok('Loaded temporary pyATS testbed for modifications', cml_server)
+    task_ok('Loaded temporary pyATS testbed for modifications', 'CML2')
 
     # Change the default terminal server username and password to look for the cml environment variables
     testbed_loaded['devices']['terminal_server']['credentials']['default']['username'] = '%ENV{VIRL2_USER}'
     testbed_loaded['devices']['terminal_server']['credentials']['default']['password'] = '%ENV{VIRL2_PASS}'
 
     # Print the result to std-out
-    task_ok('Modified terminal server username and password', cml_server)
+    task_ok('Modified terminal server username and password', 'CML2')
 
     # Uncomment for details. Dump the modified dictionary to stdout
     if args.debug:
         task_debug(json.dumps(
             testbed_loaded['devices']['terminal_server'], sort_keys=True, indent=4
-            ), cml_server
+            ), 'CML2'
         )
 
     # Print the result to std-out
-    task_ok('Modified devices default credentials for the user cmladmin', cml_server)
+    task_ok('Modified devices default credentials for the user cmladmin', 'CML2')
 
     # Changes for each node in the testbed
     for node in testbed_loaded['devices']:
@@ -848,13 +892,13 @@ if args.day0:
         yaml.dump(testbed_loaded, stream, default_flow_style=False)
 
     # Print the result to std-out
-    task_ok(f'Saved final pyATS testbed inventory/pyats_testbed_{lab.id}.yaml', cml_server)
+    task_ok(f'Saved final pyATS testbed inventory/pyats_testbed_{lab.id}.yaml', 'CML2')
 
     # Delete the temporary pyATS testbed file from the filesystem
     os.remove(f'inventory/tmp_pyats_testbed_{lab.id}.yaml')
 
     # Print the result to std-out
-    task_ok('Deleted temporary pyATS testbed from filesystem', cml_server)
+    task_ok('Deleted temporary pyATS testbed from filesystem', 'CML2')
 
     # Print task title
     task_title(f'Demo: pyATS on Nodes in Lab ID {lab.id}')
@@ -862,7 +906,7 @@ if args.day0:
     # Step 0: Load the pyATS testbed
     testbed = testbed.load(testbed_loaded)
     # Print the result to std-out
-    task_ok(f'Loaded pyATS testbed inventory/pyats_testbed_{lab.id}.yaml', cml_server)
+    task_ok(f'Loaded pyATS testbed inventory/pyats_testbed_{lab.id}.yaml', 'CML2')
     print('\n')
 
     for host in hosts_dict:
