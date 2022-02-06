@@ -619,6 +619,17 @@ if args.day0:
         sys.exit()
 
 if args.oob:
+    # Create the OOB vlan number and verify the vlan tag is between 1 and 4094
+    oob_vlan_number = oob_var_dict['oob_vlan_number']
+    if 1 <= oob_vlan_number <= 4094:
+        pass
+
+    else:
+        # Print the result to stdout
+        task_failed(f'OOB vlan number {oob_vlan_number} is not between 1 and 4094', 'CML2')
+        remove_lab(lab)
+        sys.exit()
+
     # Create the OOB network and verify its a correct network address and subnet mask
     try:
         oob_vlan_subnet = ipaddress.ip_network(oob_var_dict['oob_vlan_subnet'])
@@ -635,26 +646,18 @@ if args.oob:
 
     except ValueError as err:
         # Print the result to stdout
-        task_failed(f'OOB IP-Address {err}', 'CML2')
+        task_failed(f'OOB default-gateway {err}', 'CML2')
         remove_lab(lab)
         sys.exit()
 
     # Verify that the default-gateway is in the OOB vlan host ip range
+    all_oob_ip_adresses = []
     if oob_vlan_gateway in ipaddress.ip_network(oob_var_dict['oob_vlan_subnet']):
-        pass
-    else:
-        # Print the result to stdout
-        task_failed(f'Default-Gateway {oob_vlan_gateway} is not in OOB Vlan {oob_vlan_subnet}', 'CML2')
-        remove_lab(lab)
-        sys.exit()
+        all_oob_ip_adresses.append(str(oob_vlan_gateway))
 
-    # Create the OOB vlan number and verify the vlan tag is between 1 and 4094
-    oob_vlan_number = oob_var_dict['oob_vlan_number']
-    if 1 <= oob_vlan_number <= 4094:
-        pass
     else:
         # Print the result to stdout
-        task_failed(f'OOB VLAN number {oob_vlan_number} is not between 1 and 4094', 'CML2')
+        task_failed(f'Default-gateway {oob_vlan_gateway} is not in OOB vlan {oob_vlan_subnet}', 'CML2')
         remove_lab(lab)
         sys.exit()
 
@@ -673,13 +676,12 @@ if args.oob:
                 # Print the result to stdout
                 task_ok(f'Start editing config/cml2_{host} configuration file', host)
 
-            # Search the first tree IP-Adress to assign to the node
+            # Search the first free ip-address to assign to the node
+            # Add the first free ip-address to the list of all_oob_ip_adresses
             for ip in oob_vlan_subnet.hosts():
-                if ip == oob_vlan_gateway:
-                    print(ip)
-                    pass
-                else:
+                if str(ip) not in all_oob_ip_adresses:
                     oob_ip = ip
+                    all_oob_ip_adresses.append(str(ip))
                     print(f'First free IP-Address is {ip}')
                     break
 
@@ -689,6 +691,7 @@ if args.oob:
             node_platform = hosts_dict[host]['data']['cml_platform']
             oob_interface = 'Ethernet1/1'
 
+            # Create an empty list for all oob configuration changes
             all_oob_changes = []
 
             # OOB configuration
