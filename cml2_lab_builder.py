@@ -13,6 +13,7 @@ import timeit
 import json
 import yaml
 import ipaddress
+from time import sleep
 from virl2_client import ClientLibrary
 from virl2_client import exceptions
 from requests.exceptions import HTTPError
@@ -22,7 +23,7 @@ from genie import testbed
 
 
 __author__ = 'Willi Kubny'
-__version__ = '1.1'
+__version__ = '1.2'
 
 
 # Start the lab build timer
@@ -87,6 +88,30 @@ def task_ok(message, hostname=None):
         print(f'{green}OK: [{message}]{green_end}')
 
 
+def task_output(title, message, hostname=None):
+    """
+    Prints an OUTPUT message to shell
+    """
+    green = '\033[92m'
+    green_end = '\033[0m'
+    if hostname:
+        print(f'{green}OUTPUT: [{hostname}: {title}] =>{green_end}\n{message}')
+    else:
+        print(f'{green}OUTPUT: [{title}] =>{green_end}\n{message}')
+
+
+def task_changed(title, message, hostname=None):
+    """
+    Prints an CHANGED message to shell
+    """
+    yellow = '\033[93m'
+    yellow_end = '\033[0m'
+    if hostname:
+        print(f'{yellow}CHANGED: [{hostname}: {title}] =>\n{message}{yellow_end}')
+    else:
+        print(f'{yellow}CHANGED: [{title}] =>\n{message}{yellow_end}')
+
+
 def task_failed(message, hostname=None):
     """
     Prints a Failed message to shell
@@ -106,9 +131,9 @@ def task_debug(message, hostname=None):
     cyan = '\033[96m'
     cyan_end = '\033[0m'
     if hostname:
-        print(f'{cyan}Debug: [{hostname}]\n{message}{cyan_end}')
+        print(f'{cyan}Debug: [{hostname}] =>\n{message}{cyan_end}')
     else:
-        print(f'{cyan}Debug:\n{message}{cyan_end}')
+        print(f'{cyan}Debug: =>\n{message}{cyan_end}')
 
 
 def read_yaml_to_var(file_path):
@@ -228,26 +253,31 @@ except HTTPError as err:
 hosts_dict = read_yaml_to_var('inventory/hosts.yaml')
 # Uncomment for details. Dump the modified dictionary to stdout
 if args.debug:
-    task_debug(json.dumps(hosts_dict, sort_keys=True, indent=4))
+    task_debug(json.dumps(hosts_dict, sort_keys=True, indent=4), 'CML2')
 
 # Read the inventory/links.yaml file into a variable as dictionary
 link_dict = read_yaml_to_var('inventory/links.yaml')
 # Uncomment for details. Dump the modified dictionary to stdout
 if args.debug:
-    task_debug(json.dumps(link_dict, sort_keys=True, indent=4))
+    task_debug(json.dumps(link_dict, sort_keys=True, indent=4), 'CML2')
 
 if args.oob:
     # Read the inventory/oob.yaml file into a variable as dictionary
     oob_var_dict = read_yaml_to_var('inventory/oob.yaml')
     # Uncomment for details. Dump the modified dictionary to stdout
     if args.debug:
-        task_debug(json.dumps(oob_var_dict, sort_keys=True, indent=4))
+        task_debug(json.dumps(oob_var_dict, sort_keys=True, indent=4), 'CML2')
 
 # Print the task title
 task_title(f'Setup CML2 Lab ID {lab.id}')
 
 # Prepare the hosts dictionary with nodes for the OOB network
 if args.oob:
+    # Specify the supported node platform for the OOB network
+    oob_supported_nodes = [
+        'nxosv9000', 'nxosv', 'iosvl2', 'iosv', 'csr1000v'
+    ]
+
     # Add an unmanaged switch for OOB access to the topology
     hosts_dict['SW-OOB'] = {}
     hosts_dict['SW-OOB']['data'] = {}
@@ -268,9 +298,48 @@ if args.oob:
     # Create a variable for the external connector hostname
     external_connector = hosts_dict['EXT-CONN']['data']['cml_label']
 
-# Loop over all hosts in inventory/hosts.yaml and create nodes
+# Loop over all hosts in hosts_dict to specify the start interface slot to
+# create links at a later step and create the node
 try:
     for host in hosts_dict:
+        # Create variables for the node platform
+        node_platform = hosts_dict[host]['data']['cml_platform']
+
+        # Platforms that start with the interface 0; no mgmt interface
+        node_start_interface_0 = [
+            'server', 'unmanaged_switch', 'alpine', 'trex', 'wan_emulator',
+            'coreos', 'desktop', 'ubuntu', 'iosvl2', 'iosv', 'csr1000v',
+            'external_connector'
+        ]
+
+        # Platforms that start with the interface 1; interface 0 is mgmt
+        node_start_interface_1 = ['asav', 'nxosv9000', 'nxosv', 'iosxrv']
+
+        # Platforms that start with the interface 3; special condition
+        node_start_interface_3 = ['iosxrv9000']
+
+        # Set the start interface for the host to 0
+        if node_platform in node_start_interface_0:
+            # Create with globals() the hostname as variable without dashes
+            globals()[host.replace('-', '')] = 0
+            slot = 0
+
+        # Set the start interface for the host to 1
+        if node_platform in node_start_interface_1:
+            # Create with globals() the hostname as variable without dashes
+            globals()[host.replace('-', '')] = 1
+            slot = 1
+
+        # Set the start interface for the host to 3
+        if node_platform in node_start_interface_3:
+            # Create with globals() the hostname as variable without dashes
+            globals()[host.replace('-', '')] = 3
+            slot = 3
+
+        # Print the result to stdout
+        task_ok(f'Start interface is slot {slot}', host)
+
+        # Create the CML2 node
         lab.create_node(
             hosts_dict[host]['data']['cml_label'],
             hosts_dict[host]['data']['cml_platform'],
@@ -278,16 +347,12 @@ try:
             hosts_dict[host]['data']['cml_position'][1]
         )
 
-        # Create with globals() the hostname as variable without dashes
-        # This serves as a host specific interface counter when creating links
-        globals()[host.replace('-', '')] = 1
-
         # Print the result to stdout
         task_ok('Created node', host)
 
         # Uncomment for details. Dump the modified dictionary to stdout
         if args.debug:
-            task_debug(json.dumps(hosts_dict[host]['data'], sort_keys=True, indent=4))
+            task_debug(json.dumps(hosts_dict[host]['data'], sort_keys=True, indent=4), host)
 
 except HTTPError as err:
     # Print the result to stdout
@@ -298,13 +363,15 @@ except HTTPError as err:
 # Prepare the links dictionary with links for the OOB network
 if args.oob:
     for host in hosts_dict:
-        if host in external_connector:
-            # Create with globals() the hostname as variable without dashes
-            # This serves as a host specific interface counter for the external connector
-            globals()[host.replace('-', '')] = 0
+        # Create variables for the node platform
+        node_platform = hosts_dict[host]['data']['cml_platform']
 
-        # Exclute the unmanaged switch and the external connector to not connect each
-        # node to the unmanaged switch but not to itself
+        # Continue with the next host, if plarform is not supported for OOB build
+        if not node_platform in oob_supported_nodes:
+            continue
+
+        # Exclute the unmanaged switch and the external connector to connect each
+        # node to the unmanaged switch but not the unmanaged switch to itself
         if host not in (unmanaged_switch or external_connector):
             # Create a dictionary with the link for each host to the unmanaged switch
             oob_link = {'host_a' : host, 'host_b' : unmanaged_switch}
@@ -357,7 +424,7 @@ try:
 
         # Uncomment for details. Dump the modified dictionary to stdout
         if args.debug:
-            task_debug(json.dumps(link, sort_keys=True, indent=4))
+            task_debug(json.dumps(link, sort_keys=True, indent=4), f'{node_a.label} <-> {node_b.label}')
 
 except exceptions.NodeNotFound as err:
     # Print the result to stdout
@@ -391,10 +458,10 @@ for cml_link in lab.links():
 
             # Uncomment for details. Dump the modified dictionary to stdout
             if args.debug:
-                task_debug(json.dumps(link, sort_keys=True, indent=4))
+                task_debug(json.dumps(link, sort_keys=True, indent=4), f'{node_a.label} <-> {node_b.label}')
 
+# Dictionary Clean-up to continue the script properly for all argument variations
 if args.oob:
-    # Clean-up to continue the script properly for all argument variations
     # Copy link_dict dictionary
     oob_link_dict = link_dict.copy()
 
@@ -408,11 +475,10 @@ if args.oob:
     del hosts_dict['SW-OOB']
     del hosts_dict['EXT-CONN']
 
-if (args.day0 and args.oob) or (args.day0 or args.oob):
-    # Print the task title
-    task_title(f'Prepare Node Configuration for Lab ID {lab.id}')
-
 if args.day0:
+    # Print the task title
+    task_title(f'Prepare Node Configuration File for Lab ID {lab.id}')
+
     try:
         # Loop over all hosts in inventory/hosts.yaml to modify the configuration stored
         # in the /config directory. Then write the day 0 config to a temporary file.
@@ -432,23 +498,36 @@ if args.day0:
             if parse.has_line_with(r'^username.*role.*'):
                 # append_line() adds a line at the bottom of the configuration
                 # Add a new cmladmin user
-                nexus_cml_user = parse.append_line(
-                    'username cmladmin password 0 cisco4ever! role network-admin'
+                nxosv_cml_user = parse.append_line(
+                    'username cmladmin password 0 ciscomodelinglabs4ever! role network-admin'
                 )
-                all_general_changes.append(nexus_cml_user.text)
+                all_general_changes.append(nxosv_cml_user.text)
 
                 # Commit changes to the parser
                 parse.commit()
 
-            # iosv, iosvl2
+            # iosv, iosvl2, csr1000v
             # Finds the first line which start with username
             if parse.has_line_with(r'^username (\S+) privilege'):
                 # append_line() adds a line at the bottom of the configuration
                 # Add a new cmladmin user
-                ios_cml_user = parse.append_line(
-                    'username cmladmin privilege 15 secret 0 cisco4ever!'
+                iosv_cml_user = parse.append_line(
+                    'username cmladmin privilege 15 secret 0 ciscomodelinglabs4ever!'
                 )
-                all_general_changes.append(ios_cml_user.text)
+                all_general_changes.append(iosv_cml_user.text)
+
+                # Commit changes to the parser
+                parse.commit()
+
+            # iosxrv9000, iosxrv
+            # Finds the first line which start with username
+            if parse.has_line_with(r'^username (\S+) secret'):
+                # append_line() adds a line at the bottom of the configuration
+                # Add a new cmladmin user
+                xrv_cml_user = parse.append_line(
+                    'username cmladmin secret 0 ciscomodelinglabs4ever!'
+                )
+                all_general_changes.append(xrv_cml_user.text)
 
                 # Commit changes to the parser
                 parse.commit()
@@ -458,18 +537,20 @@ if args.day0:
                 parse,
                 r'^enable secret',
                 r'secret.*$',
-                r'secret 0 cisco4ever!'
+                r'secret 0 ciscomodelinglabs4ever!'
             )
-            all_general_changes.append(ios_changed_enable_secret)
+            if len(ios_changed_enable_secret) != 0:
+                all_general_changes.append(ios_changed_enable_secret)
 
             # Change enable password to cisco4ever!
             ios_changed_enable_pw = conf_parse_replace_lines_with_regex(
                 parse,
                 r'^enable password',
                 r'password.*$',
-                r'secret 0 cisco4ever!'
+                r'secret 0 ciscomodelinglabs4ever!'
             )
-            all_general_changes.append(ios_changed_enable_pw)
+            if len(ios_changed_enable_pw) != 0:
+                all_general_changes.append(ios_changed_enable_pw)
 
             # Print the result to stdout
             task_ok('Applied general node configuration modifications', host)
@@ -610,7 +691,7 @@ if args.day0:
 
             if not args.oob:
                 # Print the result to stdout
-                task_ok(f'Created temporary node configuration file config/cml2_{host}', host)
+                task_ok(f'Saved temporary node configuration file config/cml2_{host}', host)
 
     except FileNotFoundError as err:
         # Print the result to stdout
@@ -619,6 +700,9 @@ if args.day0:
         sys.exit()
 
 if args.oob:
+    # Print the task title
+    task_title(f'Prepare OOB Configuration for Lab ID {lab.id}')
+
     # Create the OOB vlan number and verify the vlan tag is between 1 and 4094
     oob_vlan_number = oob_var_dict['oob_vlan_number']
     if 1 <= oob_vlan_number <= 4094:
@@ -665,16 +749,21 @@ if args.oob:
     try:
         # Loop over all hosts in inventory/hosts.yaml to create the OOB configuration
         for host in hosts_dict:
-            # If the host configuration file exists
+            # Create variables for the node platform
+            node_platform = hosts_dict[host]['data']['cml_platform']
+
+            # Continue with next host, if node plarform is not supported for the OOB build
+            if not node_platform in oob_supported_nodes:
+                task_failed(f'CML2 platform {node_platform} not supported for OOB build', host)
+                continue
+
+            # If the host configuration file not exists
             if not os.path.exists(f'config/cml2_{host}'):
                 # Create a new host configuration file
                 open(f'config/cml2_{host}', 'a').close()
 
                 # Print the result to stdout
-                task_ok('Created empty node configuration file', host)
-
-                # Print the result to stdout
-                task_ok(f'Start editing config/cml2_{host} configuration file', host)
+                task_ok(f'Created empty node configuration file config/cml2_{host}', host)
 
             # Search the first free ip-address to assign to the node
             # Add the first free ip-address to the list of all_oob_ip_adresses
@@ -682,27 +771,58 @@ if args.oob:
                 if str(ip) not in all_oob_ip_adresses:
                     oob_ip = ip
                     all_oob_ip_adresses.append(str(ip))
-                    print(f'First free IP-Address is {ip}')
                     break
+
+            # Find the OOB interface by identifing the host on one end of the link
+            # and the unmanaged switch on the other end of the link
+            for link in oob_link_dict['link_list']:
+                # Create variables for host a and host b of the link
+                node_a = [link][0]['host_a']
+                node_b = [link][0]['host_b']
+                interface_a = [link][0]['cml_interface_a']
+                interface_b = [link][0]['cml_interface_b']
+
+                if (host == node_a) and ('SW-OOB' == node_b):
+                    # Create variables for the oob interface and exit the loop
+                    oob_interface = interface_a
+                    break
+
+                if (host == node_b) and ('SW-OOB' == node_a):
+                    # Create variables for the oob interface and exit the loop
+                    oob_interface = interface_b
+                    break
+
+            # Print the result to stdout
+            task_ok('OOB vlan, ip-address, interface and platform identification completed', host)
 
             # Create the CiscoConfParse object
             parse = CiscoConfParse(f'config/cml2_{host}')
 
-            node_platform = hosts_dict[host]['data']['cml_platform']
-            oob_interface = 'Ethernet1/1'
-
-            # Create an empty list for all oob configuration changes
+            # Create an empty list for the oob config and all oob configuration changes
+            oob_config = []
             all_oob_changes = []
 
-            # OOB configuration
-            if node_platform == ('nxosv9000' or 'nxosv'):
+            # OOB configuration for CML2 platform nxosv and nxosv9000
+            if 'nxosv' in node_platform:
                 oob_config = [
                     f'hostname {host}',
                     '!',
-                    'feature interface-vlan',
+                    'username admin password 0 ciscomodelinglabs4ever! role network-admin',
+                    'username cmladmin password 0 ciscomodelinglabs4ever! role network-admin',
                     '!',
-                    'vrf definition CML2-OOB',
+                    'feature interface-vlan',
+                    'feature netconf',
+                    'feature restconf',
+                    'feature nxapi',
+                    'nxapi http port 80',
+                    'nxapi https port 443',
+                    '!',
+                    'no password strength-check',
+                    'ssh key rsa 2048',
+                    '!',
+                    'vrf context CML2-OOB',
                     ' description CML2-OOB',
+                    ' address-family ipv4 unicast',
                     '!',
                     f'vlan {oob_vlan_number}',
                     ' name CML2-OOB',
@@ -714,6 +834,7 @@ if args.oob:
                     ' no shutdown',
                     '!',
                     f'interface {oob_interface}',
+                    ' description CML2-OOB',
                     ' switchport',
                     f' switchport access vlan {oob_vlan_number}',
                     ' spanning-tree port type edge',
@@ -723,11 +844,68 @@ if args.oob:
                     '!'
                 ]
 
-                # Loop over the list of configuration lines
-                for line in oob_config:
-                    # append_line() adds a line at the bottom of the configuration
-                    config_line = parse.append_line(line)
-                    all_oob_changes.append(config_line.text)
+            # OOB configuration for CML2 platform iosvl2
+            if node_platform == 'iosvl2':
+                oob_config = [
+                    f'hostname {host}',
+                    '!',
+                    'username cmladmin privilege 15 secret 0 ciscomodelinglabs4ever!',
+                    '!',
+                    'vrf definition CML2-OOB',
+                    ' description CML2-OOB',
+                    ' address-family ipv4 unicast',
+                    '!',
+                    f'vlan {oob_vlan_number}',
+                    ' name CML2-OOB',
+                    '!',
+                    f'interface vlan {oob_vlan_number}',
+                    ' vrf forwarding CML2-OOB',
+                    ' description CML2-OOB',
+                    f' ip address {oob_ip} {oob_vlan_subnet.netmask}',
+                    ' shutdown',
+                    '!',
+                    f'interface {oob_interface}',
+                    ' description CML2-OOB',
+                    ' switchport',
+                    f' switchport access vlan {oob_vlan_number}',
+                    ' spanning-tree portfast',
+                    ' no negotiation auto',
+                    ' no shutdown',
+                    '!',
+                    f'ip route vrf CML2-OOB 0.0.0.0 0.0.0.0 {oob_vlan_gateway}',
+                    '!',
+                ]
+
+            # OOB configuration for CML2 platform iosv and csr1000v
+            if (node_platform == 'iosv') or (node_platform == 'csr1000v'):
+                oob_config = [
+                    f'hostname {host}',
+                    '!',
+                    'username cmladmin privilege 15 secret 0 ciscomodelinglabs4ever!',
+                    '!',
+                    'vrf definition CML2-OOB',
+                    ' description CML2-OOB',
+                    ' address-family ipv4 unicast',
+                    '!',
+                    f'interface {oob_interface}',
+                    ' description CML2-OOB',
+                    ' vrf forwarding CML2-OOB',
+                    f' ip address {oob_ip} {oob_vlan_subnet.netmask}',
+                    ' no shutdown',
+                    '!',
+                    f'ip route vrf CML2-OOB 0.0.0.0 0.0.0.0 {oob_vlan_gateway}',
+                    '!'
+                ]
+
+            # OOB configuration for CML2 platform iosv and csr1000v
+            if 'iosxrv' in node_platform:
+                pass
+
+            # Loop over the list of configuration lines and apply it to the parser
+            for line in oob_config:
+                # append_line() adds a line at the bottom of the configuration
+                config_line = parse.append_line(line)
+                all_oob_changes.append(config_line.text)
 
             # Commit changes to the parser
             parse.commit()
@@ -743,7 +921,7 @@ if args.oob:
             parse.save_as(f'config/cml2_{host}')
 
             # Print the result to stdout
-            task_ok(f'Created temporary node configuration file config/cml2_{host}', host)
+            task_ok(f'Saved temporary node configuration file config/cml2_{host}', host)
 
     except FileNotFoundError as err:
         # Print the result to stdout
@@ -774,6 +952,15 @@ if (args.day0 and args.oob) or (args.day0 or args.oob):
             # Use globals() to set the variable name to the hostname without
             # any dash and create a node object by finding the node by its label
             globals()[host.replace('-', '')] = lab.get_node_by_label(host)
+
+            if args.oob:
+                # Create variables for the node platform
+                node_platform = hosts_dict[host]['data']['cml_platform']
+                # Continue with the next host, if node plarform is not supported
+                # for OOB network configuration apply
+                if not node_platform in oob_supported_nodes:
+                    task_failed(f'No OOB node configuration to apply', host)
+                    continue
 
             # Read new day 0 config file line by line into a list of strings
             with open(f'config/cml2_{host}', 'r', encoding='utf-8') as stream:
@@ -831,7 +1018,7 @@ except:
 # Stop the lab build timer
 lab_stop_time = timeit.default_timer()
 
-if args.day0:
+if (args.day0 and args.oob) or (args.day0 or args.oob):
     # Print the task title
     task_title(f'Initializing pyATS Testbed for Lab ID {lab.id}')
 
@@ -864,31 +1051,27 @@ if args.day0:
 
     # Uncomment for details. Dump the modified dictionary to stdout
     if args.debug:
-        task_debug(json.dumps(
-            testbed_loaded['devices']['terminal_server'], sort_keys=True, indent=4
-            ), 'CML2'
-        )
-
-    # Print the result to std-out
-    task_ok('Modified devices default credentials for the user cmladmin', 'CML2')
+        task_debug(json.dumps(testbed_loaded['devices']['terminal_server'], sort_keys=True, indent=4), 'CML2')
 
     # Changes for each node in the testbed
     for node in testbed_loaded['devices']:
         if 'terminal_server' not in node:
-            # Change the key from series to platform as series has been deprecated
-            testbed_loaded['devices'][node]['platform'] = testbed_loaded['devices'][node]['series']
-            # Delete the key series
-            del testbed_loaded['devices'][node]['series']
             # Change the default credentials
             testbed_loaded['devices'][node]['credentials']['default']['username'] = 'cmladmin'
-            testbed_loaded['devices'][node]['credentials']['default']['password'] = 'cisco4ever!'
+            testbed_loaded['devices'][node]['credentials']['default']['password'] = 'ciscomodelinglabs4ever!'
+
+            if 'series' in testbed_loaded['devices'][node]:
+                # Change the key from series to platform as series has been deprecated
+                testbed_loaded['devices'][node]['platform'] = testbed_loaded['devices'][node]['series']
+                # Delete the key series
+                del testbed_loaded['devices'][node]['series']
+
+            # Print the result to std-out
+            task_ok('Modified device default credentials for the user cmladmin', node)
 
             # Uncomment for details. Dump the modified dictionary to stdout
             if args.debug:
-                task_debug(json.dumps(
-                    testbed_loaded['devices'][node], sort_keys=True, indent=4
-                    ), node
-                )
+                task_debug(json.dumps(testbed_loaded['devices'][node], sort_keys=True, indent=4), node)
 
     # Write the modified pyATS testbed to a file
     with open(f'inventory/pyats_testbed_{lab.id}.yaml', 'w', encoding='utf-8') as stream:
@@ -913,26 +1096,93 @@ if args.day0:
     print('\n')
 
     for host in hosts_dict:
+        # Create variables for the node platform
+        node_platform = hosts_dict[host]['data']['cml_platform']
+
+        # If only args.oob is set, verify if the node is supported with the OOB configuration
+        if not args.day0:
+            # Continue with the next host, if node plarform is not supported for OOB
+            if not node_platform in oob_supported_nodes:
+                task_failed(f'PyATS not working as no node configuration is loaded', host)
+                continue
+
         # Step 1: The testbed is a dictionary. Extract the device hostname and create an object
-        switch = testbed.devices[host]
+        device = testbed.devices[host]
 
         # Print the result to std-out
         task_ok('Extracted the device hostname and create an object', host)
 
         # Step 2: Connect to the device
-        switch.connect(init_exec_commands=[], init_config_commands=[], log_stdout=False)
+        device.connect(init_exec_commands=[], init_config_commands=[], log_stdout=False)
         # Print the result to std-out
         task_ok('Connected to the device', host)
 
-        # Step 3: Parsing output of show version into a dictionary
-        command = switch.parse('show version')
+        # Step 3: Run command and configurations. Parsing output of show version into a dictionary
+        show_version = device.parse('show version')
         # Print the result to std-out
-        task_ok('Parsing output of show version into a dictionary', host)
-        if args.debug:
-            print_colored(json.dumps(command, sort_keys=True, indent=4), 'cyan')
+        task_output(
+            'PyATS genie parser - show version',
+            json.dumps(show_version, sort_keys=True, indent=4),
+            host
+        )
+
+        # Verify the OOB ip-addresses are up with show ip interface brief
+        if args.oob:
+            # For nxosv and nxosv9000
+            if 'nxosv' in node_platform:
+                # Parsing output of show version into a dictionary
+                show_ip_interface_brief = device.execute('show ip interface brief vrf CML2-OOB')
+                # Print the result to std-out
+                task_output(
+                    'PyATS execute - show ip interface brief vrf CML2-OOB',
+                    show_ip_interface_brief,
+                    host
+                )
+
+            # If the platform is iosvl2 the oob vlan needs to set to shutdown and again
+            # to no shutdown. Otherwise the oob vlan stay down which seems like a bug
+            if node_platform == 'iosvl2':
+
+                # Set the OOB SVI to shutdown
+                svi_shutdown = device.configure(
+                    f"interface Vlan {oob_vlan_number} \n"
+                    f"shutdown \n"
+                )
+                # Print the result to std-out
+                task_changed(
+                    f'PyATS configure - Shutdown interface vlan {oob_vlan_number}',
+                    svi_shutdown,
+                    host
+                )
+
+                # Pause the script for 5 seconds
+                sleep(5)
+
+                # Set the OOB SVI to no shutdown
+                svi_no_shutdown = device.configure(
+                    f"interface Vlan {oob_vlan_number} \n"
+                    f"no shutdown \n"
+                )
+                # Print the result to std-out
+                task_changed(
+                    f'PyATS configure - No shutdown interface vlan {oob_vlan_number}',
+                    svi_no_shutdown,
+                    host
+                )
+
+            # For iosv and iosvl2
+            if ('iosv' in node_platform) or (node_platform == 'csr1000v'):
+                # Parsing output of show version into a dictionary
+                show_ip_interface_brief = device.parse('show ip interface brief')
+                # Print the result to std-out
+                task_output(
+                    'PyATS genie parser - show ip interface brief',
+                    json.dumps(show_ip_interface_brief, sort_keys=True, indent=4),
+                    host
+                )
 
         # Step 5: Disconnect from the device
-        switch.disconnect()
+        device.disconnect()
         # Print the result to std-out
         task_ok('Disconnected from the device', host)
         print('\n')
@@ -952,7 +1202,7 @@ sys.stdout.write(
     '\033[0m' % (lab_minutes, lab_seconds)
 )
 
-if args.day0:
+if (args.day0 and args.oob) or (args.day0 or args.oob):
     # Stop the pyATS automation timer
     pyats_stop_time = timeit.default_timer()
 
@@ -969,6 +1219,7 @@ if args.day0:
     )
 
 # Print some details about the created CML2 lab
+print(dir(lab))
 print_colored(
     f'\n'
     f'Title: {lab.title:<22}'
@@ -978,10 +1229,24 @@ print_colored(
 
 # Print some details about each node
 for node in lab.nodes():
+    print(dir(node))
     print_colored(
         f'Node: {node.label:<22}'
         f'ID: {node.id:<12}'
         f'State: {node.state:<12}'
         f'CPU: {node.cpu_usage:}%', 'green'
     )
+
+host_ok = '???'
+host_changed = '???'
+host_failed = '???'
+# Print recap status with amount of OK and failed commands per host
+for host in hosts_dict:
+    print_colored(
+        f'{host:<20}:'
+        f'OK={host_ok:<10}'
+        f'CHANGED={host_changed:<10}'
+        f'Failed={host_failed:<10}', 'green'
+        )
+
 print('\n')
