@@ -1,6 +1,14 @@
 ---
-# OOB network configuration file
+# OOB network configuration file.
+# The oob_vlan_number needs to be an integer. The oob_vlan_subnet needs
+# to be the subnet with the mask as /xx and the oob_vlan_gateway needs
+# to be an ip-address within this range.
+#
+# For example:
+# oob_vlan_number: 100
+# oob_vlan_subnet: 10.10.100.0/24
+# oob_vlan_gateway: 10.10.100.1
 
 oob_vlan_number: 100
-oob_vlan_subnet: 192.168.1.0/24
-oob_vlan_gateway: 192.168.1.1
+oob_vlan_subnet: 10.10.100.0/24
+oob_vlan_gateway: 10.10.100.1

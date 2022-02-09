@@ -2,38 +2,84 @@
 # For CML2 only the data dictionary with cml_label, cml_platform
 # and cml_position under the hostname is required.
 #
-# The following is an inventory example to extend the host file and
-# connect with Nornir over the CML2 breakout tool to a device.
+# The following is an inventory example to extend a nornir host
+# file with the information needed by the cml2_lab_build script.
 #
-# SW-1:
-#  hostname: 127.0.0.1
-#  port: 9000
+# NXOS-SW-1:
+#  hostname: 10.10.100.11
 #  username: cisco
 #  password: cisco
-#  platform: ios
 #  connection_options:
+#    netmiko:
+#      platform: cisco_nxos_ssh
 #    napalm:
+#      platform: nxos_ssh
+#    netconf:
 #      extras:
-#        optional_args: {'transport': 'telnet'}
+#        allow_agent: False
+#        hostkey_verify: False
+#        look_for_keys: False
 #  data:
 #     cml_label: SW-1
 #     cml_platform: iosvl2
 #     cml_position: [0, -100]
 
-N9K-01:
+nxosv9000:
   data:
-    cml_label: N9K-01
+    cml_label: nxosv9000
     cml_platform: nxosv9000
-    cml_position: [-300, 0]
+    cml_position: [0, -300]
 
-N9K-02:
+nxosv:
   data:
-    cml_label: N9K-02
-    cml_platform: nxosv9000
-    cml_position: [0, -150]
+    cml_label: nxosv
+    cml_platform: nxosv
+    cml_position: [0, -200]
 
-N9K-03:
+iosvl2:
   data:
-    cml_label: N9K-03
-    cml_platform: nxosv9000
-    cml_position: [0, 150]
+    cml_label: iosvl2
+    cml_platform: iosvl2
+    cml_position: [0, -100]
+
+coreos:
+  data:
+    cml_label: coreos
+    cml_platform: coreos
+    cml_position: [100, -200]
+
+alpine:
+  data:
+    cml_label: alpine
+    cml_platform: alpine
+    cml_position: [100, -100]
+
+server:
+  data:
+    cml_label: server
+    cml_platform: server
+    cml_position: [100, 0]
+
+iosv:
+  data:
+    cml_label: iosv
+    cml_platform: iosv
+    cml_position: [0, 0]
+
+iosxrv:
+  data:
+    cml_label: iosxrv
+    cml_platform: iosxrv
+    cml_position: [0, 100]
+
+iosxrv9000:
+  data:
+    cml_label: iosxrv9000
+    cml_platform: iosxrv9000
+    cml_position: [0, 200]
+
+csr1000v:
+  data:
+    cml_label: csr1000v
+    cml_platform: csr1000v
+    cml_position: [0, 300]

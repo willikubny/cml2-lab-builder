@@ -76,7 +76,7 @@ def task_title(title):
     print(f'\n{bold}{heading}{asterisk_line}{bold_end}\n')
 
 
-def task_ok(message, hostname=None):
+def task_ok(message, hostname=None, host_counter=None):
     """
     Prints an OK message to shell
     """
@@ -84,6 +84,8 @@ def task_ok(message, hostname=None):
     green_end = '\033[0m'
     if hostname:
         print(f'{green}OK: [{hostname}: {message}]{green_end}')
+        if host_counter:
+            host_counter[hostname]['host_ok'] += 1
     else:
         print(f'{green}OK: [{message}]{green_end}')
 
@@ -214,6 +216,25 @@ if args.debug and (args.debug != 'enable'):
 # Print the task title
 task_title('Initializing CML2 Server Connection')
 
+# Read the inventory/hosts.yaml file into a variable as dictionary
+hosts_dict = read_yaml_to_var('inventory/hosts.yaml')
+# Uncomment for details. Dump the modified dictionary to stdout
+if args.debug:
+    task_debug(json.dumps(hosts_dict, sort_keys=True, indent=4), 'CML2')
+
+# Read the inventory/links.yaml file into a variable as dictionary
+link_dict = read_yaml_to_var('inventory/links.yaml')
+# Uncomment for details. Dump the modified dictionary to stdout
+if args.debug:
+    task_debug(json.dumps(link_dict, sort_keys=True, indent=4), 'CML2')
+
+if args.oob:
+    # Read the inventory/oob.yaml file into a variable as dictionary
+    oob_var_dict = read_yaml_to_var('inventory/oob.yaml')
+    # Uncomment for details. Dump the modified dictionary to stdout
+    if args.debug:
+        task_debug(json.dumps(oob_var_dict, sort_keys=True, indent=4), 'CML2')
+
 # Verify that environment variables are set to connect to the CML2 server
 # Raise a KeyError when environment variable is None and stop the script
 try:
@@ -248,25 +269,6 @@ try:
 except HTTPError as err:
     task_failed(f'{err}', 'CML2')
     sys.exit()
-
-# Read the inventory/hosts.yaml file into a variable as dictionary
-hosts_dict = read_yaml_to_var('inventory/hosts.yaml')
-# Uncomment for details. Dump the modified dictionary to stdout
-if args.debug:
-    task_debug(json.dumps(hosts_dict, sort_keys=True, indent=4), 'CML2')
-
-# Read the inventory/links.yaml file into a variable as dictionary
-link_dict = read_yaml_to_var('inventory/links.yaml')
-# Uncomment for details. Dump the modified dictionary to stdout
-if args.debug:
-    task_debug(json.dumps(link_dict, sort_keys=True, indent=4), 'CML2')
-
-if args.oob:
-    # Read the inventory/oob.yaml file into a variable as dictionary
-    oob_var_dict = read_yaml_to_var('inventory/oob.yaml')
-    # Uncomment for details. Dump the modified dictionary to stdout
-    if args.debug:
-        task_debug(json.dumps(oob_var_dict, sort_keys=True, indent=4), 'CML2')
 
 # Print the task title
 task_title(f'Setup CML2 Lab ID {lab.id}')
@@ -1219,34 +1221,21 @@ if (args.day0 and args.oob) or (args.day0 or args.oob):
     )
 
 # Print some details about the created CML2 lab
-print(dir(lab))
 print_colored(
     f'\n'
     f'Title: {lab.title:<22}'
     f'ID: {lab.id:<12}'
     f'URL: {lab.lab_base_url}\n', 'green'
 )
+print(json.dumps(lab.details(), sort_keys=True, indent=4))
+print(json.dumps(lab.interfaces(), sort_keys=True, indent=4))
+print(json.dumps(lab.links(), sort_keys=True, indent=4))
 
 # Print some details about each node
 for node in lab.nodes():
-    print(dir(node))
     print_colored(
         f'Node: {node.label:<22}'
         f'ID: {node.id:<12}'
         f'State: {node.state:<12}'
-        f'CPU: {node.cpu_usage:}%', 'green'
+        f'CPU: {node.cpu_usage:}%\n', 'green'
     )
-
-host_ok = '???'
-host_changed = '???'
-host_failed = '???'
-# Print recap status with amount of OK and failed commands per host
-for host in hosts_dict:
-    print_colored(
-        f'{host:<20}:'
-        f'OK={host_ok:<10}'
-        f'CHANGED={host_changed:<10}'
-        f'Failed={host_failed:<10}', 'green'
-        )
-
-print('\n')
