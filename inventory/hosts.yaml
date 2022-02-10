@@ -24,62 +24,32 @@
 #     cml_platform: iosvl2
 #     cml_position: [0, -100]
 
-nxosv9000:
+N9K-01:
   data:
-    cml_label: nxosv9000
+    cml_label: N9K-01
     cml_platform: nxosv9000
-    cml_position: [0, -300]
+    cml_position: [-300, 0]
 
-nxosv:
+N9K-02:
   data:
-    cml_label: nxosv
-    cml_platform: nxosv
-    cml_position: [0, -200]
+    cml_label: N9K-02
+    cml_platform: nxosv9000
+    cml_position: [0, -150]
 
-iosvl2:
+N9K-03:
   data:
-    cml_label: iosvl2
+    cml_label: N9K-03
+    cml_platform: nxosv9000
+    cml_position: [0, 150]
+
+SW-1:
+  data:
+    cml_label: SW-1
     cml_platform: iosvl2
-    cml_position: [0, -100]
-
-coreos:
-  data:
-    cml_label: coreos
-    cml_platform: coreos
-    cml_position: [100, -200]
-
-alpine:
-  data:
-    cml_label: alpine
-    cml_platform: alpine
-    cml_position: [100, -100]
-
-server:
-  data:
-    cml_label: server
-    cml_platform: server
-    cml_position: [100, 0]
-
-iosv:
-  data:
-    cml_label: iosv
-    cml_platform: iosv
-    cml_position: [0, 0]
-
-iosxrv:
-  data:
-    cml_label: iosxrv
-    cml_platform: iosxrv
-    cml_position: [0, 100]
-
-iosxrv9000:
-  data:
-    cml_label: iosxrv9000
-    cml_platform: iosxrv9000
-    cml_position: [0, 200]
-
-csr1000v:
-  data:
-    cml_label: csr1000v
-    cml_platform: csr1000v
     cml_position: [0, 300]
+
+Alpine:
+  data:
+    cml_label: Alpine
+    cml_platform: alpine
+    cml_position: [0, 400]

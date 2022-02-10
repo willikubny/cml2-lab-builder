@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """
 Creates a CML2 lab with all needed nodes, interfaces and links.
-Loads Cisco configuration files and modifies them to match the CML2 lab.
-Creates a Cisco pyATS testbed file.
-For more information, read the documentation on Github.
+Optional:
+- Loads configuration files and modifies the interfaces to match the CML2 lab.
+- Creates a OOB network with external access in bridged mode
+- Creates a pyATS testbed file.
+For more information, read the README.md documentation.
 """
 
 import os
@@ -11,9 +13,9 @@ import sys
 import argparse
 import timeit
 import json
-import yaml
 import ipaddress
 from time import sleep
+import yaml
 from virl2_client import ClientLibrary
 from virl2_client import exceptions
 from requests.exceptions import HTTPError
@@ -61,7 +63,7 @@ def print_colored(message, color=None, style=None):
 
 def task_title(title):
     """
-    Prints the Task title to shell
+    Prints the Task title to stdout
     """
     # Get shell window width and height
     terminal_size = os.get_terminal_size()
@@ -76,23 +78,21 @@ def task_title(title):
     print(f'\n{bold}{heading}{asterisk_line}{bold_end}\n')
 
 
-def task_ok(message, hostname=None, host_counter=None):
+def task_ok(message, hostname=None):
     """
-    Prints an OK message to shell
+    Prints an OK message to stdout
     """
     green = '\033[92m'
     green_end = '\033[0m'
     if hostname:
         print(f'{green}OK: [{hostname}: {message}]{green_end}')
-        if host_counter:
-            host_counter[hostname]['host_ok'] += 1
     else:
         print(f'{green}OK: [{message}]{green_end}')
 
 
 def task_output(title, message, hostname=None):
     """
-    Prints an OUTPUT message to shell
+    Prints an OUTPUT message to stdout
     """
     green = '\033[92m'
     green_end = '\033[0m'
@@ -104,7 +104,7 @@ def task_output(title, message, hostname=None):
 
 def task_changed(title, message, hostname=None):
     """
-    Prints an CHANGED message to shell
+    Prints an CHANGED message to stdout
     """
     yellow = '\033[93m'
     yellow_end = '\033[0m'
@@ -116,7 +116,7 @@ def task_changed(title, message, hostname=None):
 
 def task_failed(message, hostname=None):
     """
-    Prints a Failed message to shell
+    Prints a Failed message to stdout
     """
     red = '\033[91m'
     red_end = '\033[0m'
@@ -128,7 +128,7 @@ def task_failed(message, hostname=None):
 
 def task_debug(message, hostname=None):
     """
-    Prints a Debug output to shell
+    Prints a Debug output to stdout
     """
     cyan = '\033[96m'
     cyan_end = '\033[0m'
@@ -190,8 +190,9 @@ def conf_parse_replace_lines_with_regex(parser, find, match, replace):
 
 # Define the arguments which needs to be given to the script execution
 argparser = argparse.ArgumentParser(
-    description='''Creates a CML2 lab from a hosts.yaml, a links.yaml file
-    and optional day 0 device configurations files.'''
+    description='''Creates a CML2 lab from a hosts.yaml and a links.yaml.
+    Optional creates a OOB network from a oob.yaml file and applies day 0
+    device configurations files.'''
 )
 # Add a script parser argument
 argparser.add_argument('--day0', help='Optional: Enable day 0 configuration', required=False)
@@ -203,15 +204,15 @@ args = argparser.parse_args()
 
 # If the --day0 argument is set, verify that the argument is "enable"
 if args.day0 and (args.day0 != 'enable'):
-        argparser.error('For argument --day0 please specify "enable".')
+    argparser.error('For argument --day0 please specify "enable".')
 
 # If the --oob argument is set, verify that the argument is "enable"
 if args.oob and (args.oob != 'enable'):
-        argparser.error('For argument --oob please specify "enable".')
+    argparser.error('For argument --oob please specify "enable".')
 
 # If the --debug argument is set, verify that the argument is "enable"
 if args.debug and (args.debug != 'enable'):
-        argparser.error('For argument --debug please specify "enable".')
+    argparser.error('For argument --debug please specify "enable".')
 
 # Print the task title
 task_title('Initializing CML2 Server Connection')
@@ -249,16 +250,16 @@ except KeyError as err:
     task_failed(f'Environment variable {err} not found')
     sys.exit()
 
-# Connect to the CML2 server
-cml = ClientLibrary(
-    cml_server,
-    cml_user,
-    cml_password,
-    ssl_verify=False
-    )
-
-# Create the CML2 lab
 try:
+    # Connect to the CML2 server
+    cml = ClientLibrary(
+        cml_server,
+        cml_user,
+        cml_password,
+        ssl_verify=False
+        )
+
+    # Create the CML2 lab
     lab = cml.create_lab()
     lab.title = f'Lab_ID_{lab.id}'
 
@@ -273,11 +274,12 @@ except HTTPError as err:
 # Print the task title
 task_title(f'Setup CML2 Lab ID {lab.id}')
 
-# Prepare the hosts dictionary with nodes for the OOB network
+# Prepare the hosts_dict dictionary with the unmanaged switch and the
+# external connector for the OOB network
 if args.oob:
     # Specify the supported node platform for the OOB network
     oob_supported_nodes = [
-        'nxosv9000', 'nxosv', 'iosvl2', 'iosv', 'csr1000v'
+        'nxosv9000', 'nxosv', 'iosvl2', 'iosv', 'csr1000v', 'iosxrv', 'iosxrv9000'
     ]
 
     # Add an unmanaged switch for OOB access to the topology
@@ -285,7 +287,7 @@ if args.oob:
     hosts_dict['SW-OOB']['data'] = {}
     hosts_dict['SW-OOB']['data']['cml_label'] = 'SW-OOB'
     hosts_dict['SW-OOB']['data']['cml_platform'] = 'unmanaged_switch'
-    hosts_dict['SW-OOB']['data']['cml_position'] = [-800, 0]
+    hosts_dict['SW-OOB']['data']['cml_position'] = [-1000, 0]
 
     # Create a variable for the unmanaged switch hostname
     unmanaged_switch = hosts_dict['SW-OOB']['data']['cml_label']
@@ -295,7 +297,7 @@ if args.oob:
     hosts_dict['EXT-CONN']['data'] = {}
     hosts_dict['EXT-CONN']['data']['cml_label'] = 'EXT-CONN'
     hosts_dict['EXT-CONN']['data']['cml_platform'] = 'external_connector'
-    hosts_dict['EXT-CONN']['data']['cml_position'] = [-1000, 0]
+    hosts_dict['EXT-CONN']['data']['cml_position'] = [-1000, -100]
 
     # Create a variable for the external connector hostname
     external_connector = hosts_dict['EXT-CONN']['data']['cml_label']
@@ -362,19 +364,24 @@ except HTTPError as err:
     remove_lab(lab)
     sys.exit()
 
-# Prepare the links dictionary with links for the OOB network
+# Prepare the link_dict dictionary with the additional links for the OOB network
 if args.oob:
+    # Insert a dictionary with the link between the external connector and the
+    # unmanaged switch into to link_dict dictionary as the first element
+    ext_conn_link = {'host_a' : external_connector, 'host_b' : unmanaged_switch}
+    link_dict['link_list'].insert(0, ext_conn_link)
+
     for host in hosts_dict:
         # Create variables for the node platform
         node_platform = hosts_dict[host]['data']['cml_platform']
 
         # Continue with the next host, if plarform is not supported for OOB build
-        if not node_platform in oob_supported_nodes:
+        if node_platform not in oob_supported_nodes:
             continue
 
         # Exclute the unmanaged switch and the external connector to connect each
         # node to the unmanaged switch but not the unmanaged switch to itself
-        if host not in (unmanaged_switch or external_connector):
+        if host != unmanaged_switch:
             # Create a dictionary with the link for each host to the unmanaged switch
             oob_link = {'host_a' : host, 'host_b' : unmanaged_switch}
 
@@ -382,7 +389,7 @@ if args.oob:
             # The first links are the OOB links followed by the regular node links
             link_dict['link_list'].insert(0, oob_link)
 
-# Loop over all links in inventory/links.yaml and create links
+# Loop over all links in the link_dict directory and create links
 try:
     # The link ID will later be used to map the generated links by cml
     link_id = 0
@@ -435,7 +442,6 @@ except exceptions.NodeNotFound as err:
     sys.exit()
 
 # With this block the cml lab interface details will be added to the link_dict
-# Loop over all links in the lab
 for cml_link in lab.links():
     # Loop over all links in the inventory/links.yaml file
     for link in link_dict['link_list']:
@@ -454,7 +460,7 @@ for cml_link in lab.links():
 
             # Print the result to stdout
             task_ok(
-                'Added dynamic CML2 link details to dictionary',
+                'Added dynamic CML2 link details',
                 f'{node_a.label} <-> {node_b.label}'
             )
 
@@ -482,9 +488,15 @@ if args.day0:
     task_title(f'Prepare Node Configuration File for Lab ID {lab.id}')
 
     try:
-        # Loop over all hosts in inventory/hosts.yaml to modify the configuration stored
+        # Loop over all hosts in hosts_dict to modify the configuration stored
         # in the /config directory. Then write the day 0 config to a temporary file.
         for host in hosts_dict:
+            # If the host configuration file not exists
+            if not os.path.exists(f'config/{host}'):
+                # Print the result to stdout
+                task_failed(f'Configuration file config/{host} not found', host)
+                continue
+
             # Create the CiscoConfParse object
             parse = CiscoConfParse(f'config/{host}')
 
@@ -701,6 +713,8 @@ if args.day0:
         remove_lab(lab)
         sys.exit()
 
+# This block validates all OOB network specifications and creates the node
+# specific OOB configuration files to apply in a later stage
 if args.oob:
     # Print the task title
     task_title(f'Prepare OOB Configuration for Lab ID {lab.id}')
@@ -754,15 +768,15 @@ if args.oob:
             # Create variables for the node platform
             node_platform = hosts_dict[host]['data']['cml_platform']
 
-            # Continue with next host, if node plarform is not supported for the OOB build
-            if not node_platform in oob_supported_nodes:
-                task_failed(f'CML2 platform {node_platform} not supported for OOB build', host)
+            # Continue with next host, if node plarform is not implemented for the OOB build
+            if node_platform not in oob_supported_nodes:
+                task_failed(f'CML2 platform {node_platform} not implemented for OOB build', host)
                 continue
 
             # If the host configuration file not exists
             if not os.path.exists(f'config/cml2_{host}'):
                 # Create a new host configuration file
-                open(f'config/cml2_{host}', 'a').close()
+                open(f'config/cml2_{host}', 'a', encoding='utf-8').close()
 
                 # Print the result to stdout
                 task_ok(f'Created empty node configuration file config/cml2_{host}', host)
@@ -773,6 +787,7 @@ if args.oob:
                 if str(ip) not in all_oob_ip_adresses:
                     oob_ip = ip
                     all_oob_ip_adresses.append(str(ip))
+                    hosts_dict[host]['data']['oob_ip'] = oob_ip
                     break
 
             # Find the OOB interface by identifing the host on one end of the link
@@ -805,7 +820,7 @@ if args.oob:
             all_oob_changes = []
 
             # OOB configuration for CML2 platform nxosv and nxosv9000
-            if 'nxosv' in node_platform:
+            if node_platform in ('nxosv', 'nxosv9000'):
                 oob_config = [
                     f'hostname {host}',
                     '!',
@@ -847,7 +862,7 @@ if args.oob:
                 ]
 
             # OOB configuration for CML2 platform iosvl2
-            if node_platform == 'iosvl2':
+            if node_platform in 'iosvl2':
                 oob_config = [
                     f'hostname {host}',
                     '!',
@@ -864,7 +879,7 @@ if args.oob:
                     ' vrf forwarding CML2-OOB',
                     ' description CML2-OOB',
                     f' ip address {oob_ip} {oob_vlan_subnet.netmask}',
-                    ' shutdown',
+                    ' no shutdown',
                     '!',
                     f'interface {oob_interface}',
                     ' description CML2-OOB',
@@ -879,7 +894,7 @@ if args.oob:
                 ]
 
             # OOB configuration for CML2 platform iosv and csr1000v
-            if (node_platform == 'iosv') or (node_platform == 'csr1000v'):
+            if node_platform in ('iosv', 'csr1000v'):
                 oob_config = [
                     f'hostname {host}',
                     '!',
@@ -899,9 +914,26 @@ if args.oob:
                     '!'
                 ]
 
-            # OOB configuration for CML2 platform iosv and csr1000v
-            if 'iosxrv' in node_platform:
-                pass
+            # OOB configuration for CML2 platform iosxrv and iosxrv9000
+            if node_platform in ('iosxrv', 'iosxrv9000'):
+                oob_config = [
+                    f'hostname {host}',
+                    '!',
+                    'username cmladmin secret 0 ciscomodelinglabs4ever!',
+                    'username cmladmin group root-system',
+                    '!',
+                    'vrf CML2-OOB',
+                    ' description CML2-OOB',
+                    ' address-family ipv4 unicast',
+                    '!',
+                    f'interface {oob_interface}',
+                    ' description CML2-OOB',
+                    ' vrf CML2-OOB',
+                    f' ipv4 address {oob_ip} {oob_vlan_subnet.netmask}',
+                    ' no shutdown',
+                    '!',
+                    f'router static vrf CML2-OOB address-family ipv4 unicast 0.0.0.0/0 {oob_vlan_gateway}'
+                ]
 
             # Loop over the list of configuration lines and apply it to the parser
             for line in oob_config:
@@ -960,8 +992,8 @@ if (args.day0 and args.oob) or (args.day0 or args.oob):
                 node_platform = hosts_dict[host]['data']['cml_platform']
                 # Continue with the next host, if node plarform is not supported
                 # for OOB network configuration apply
-                if not node_platform in oob_supported_nodes:
-                    task_failed(f'No OOB node configuration to apply', host)
+                if node_platform not in oob_supported_nodes:
+                    task_failed('No OOB node configuration to apply', host)
                     continue
 
             # Read new day 0 config file line by line into a list of strings
@@ -1101,12 +1133,10 @@ if (args.day0 and args.oob) or (args.day0 or args.oob):
         # Create variables for the node platform
         node_platform = hosts_dict[host]['data']['cml_platform']
 
-        # If only args.oob is set, verify if the node is supported with the OOB configuration
-        if not args.day0:
-            # Continue with the next host, if node plarform is not supported for OOB
-            if not node_platform in oob_supported_nodes:
-                task_failed(f'PyATS not working as no node configuration is loaded', host)
-                continue
+        # Continue with the next host, if node plarform is not supported for OOB
+        if node_platform not in oob_supported_nodes:
+            task_failed(f'PyATS not supported or not implemented for node {host}', host)
+            continue
 
         # Step 1: The testbed is a dictionary. Extract the device hostname and create an object
         device = testbed.devices[host]
@@ -1120,19 +1150,21 @@ if (args.day0 and args.oob) or (args.day0 or args.oob):
         task_ok('Connected to the device', host)
 
         # Step 3: Run command and configurations. Parsing output of show version into a dictionary
-        show_version = device.parse('show version')
-        # Print the result to std-out
-        task_output(
-            'PyATS genie parser - show version',
-            json.dumps(show_version, sort_keys=True, indent=4),
-            host
-        )
 
-        # Verify the OOB ip-addresses are up with show ip interface brief
-        if args.oob:
-            # For nxosv and nxosv9000
-            if 'nxosv' in node_platform:
-                # Parsing output of show version into a dictionary
+        # For nxosv and nxosv9000
+        if 'nxosv' in node_platform:
+            # pyATS parse show version
+            show_version = device.parse('show version')
+            # Print the result to std-out
+            task_output(
+                'PyATS genie parser - show version',
+                json.dumps(show_version, sort_keys=True, indent=4),
+                host
+            )
+
+            # Verify the OOB ip-addresses are up with show ip interface brief
+            if args.oob:
+                # pyATS execute show ip interface brief vrf CML2-OOB
                 show_ip_interface_brief = device.execute('show ip interface brief vrf CML2-OOB')
                 # Print the result to std-out
                 task_output(
@@ -1141,9 +1173,28 @@ if (args.day0 and args.oob) or (args.day0 or args.oob):
                     host
                 )
 
-            # If the platform is iosvl2 the oob vlan needs to set to shutdown and again
-            # to no shutdown. Otherwise the oob vlan stay down which seems like a bug
-            if node_platform == 'iosvl2':
+        # If the platform is iosvl2 the oob vlan needs to set to shutdown and again
+        # to no shutdown. Otherwise the oob vlan stay down which seems like a bug
+        if node_platform in 'iosvl2':
+            # pyATS parse show version
+            show_version = device.parse('show version')
+            # Print the result to std-out
+            task_output(
+                'PyATS genie parser - show version',
+                json.dumps(show_version, sort_keys=True, indent=4),
+                host
+            )
+
+            # Verify the OOB ip-addresses are up with show ip interface brief
+            if args.oob:
+                # pyATS parse show ip interface brief
+                cmd = device.parse('show ip interface brief')
+                # Print the result to std-out
+                task_output(
+                    'PyATS genie parser - show ip interface brief',
+                    json.dumps(cmd['interface'][f'Vlan{oob_vlan_number}'], sort_keys=True, indent=4),
+                    host
+                )
 
                 # Set the OOB SVI to shutdown
                 svi_shutdown = device.configure(
@@ -1172,9 +1223,50 @@ if (args.day0 and args.oob) or (args.day0 or args.oob):
                     host
                 )
 
-            # For iosv and iosvl2
-            if ('iosv' in node_platform) or (node_platform == 'csr1000v'):
-                # Parsing output of show version into a dictionary
+                cmd = device.parse('show ip interface brief')
+                # Print the result to std-out
+                task_output(
+                    'PyATS genie parser - show ip interface brief',
+                    json.dumps(cmd['interface'][f'Vlan{oob_vlan_number}'], sort_keys=True, indent=4),
+                    host
+                )
+
+        # For iosv and csr1000v
+        if node_platform in ('iosv', 'csr1000v'):
+            # pyATS parse show version
+            show_version = device.parse('show version')
+            # Print the result to std-out
+            task_output(
+                'PyATS genie parser - show version',
+                json.dumps(show_version, sort_keys=True, indent=4),
+                host
+            )
+
+            # Verify the OOB ip-addresses are up with show ip interface brief
+            if args.oob:
+                # pyATS parese show ip interface brief
+                show_ip_interface_brief = device.parse('show ip interface brief')
+                # Print the result to std-out
+                task_output(
+                    'PyATS genie parser - show ip interface brief',
+                    json.dumps(show_ip_interface_brief, sort_keys=True, indent=4),
+                    host
+                )
+
+        # For iosxrv and iosxrv9000
+        if 'iosxrv' in node_platform:
+            # pyATS parse show version
+            show_version = device.parse('show version')
+            # Print the result to std-out
+            task_output(
+                'PyATS genie parser - show version',
+                json.dumps(show_version, sort_keys=True, indent=4),
+                host
+            )
+
+            # Verify the OOB ip-addresses are up with show ip interface brief
+            if args.oob:
+                # pyATS parse show ip interface brief
                 show_ip_interface_brief = device.parse('show ip interface brief')
                 # Print the result to std-out
                 task_output(
@@ -1192,6 +1284,8 @@ if (args.day0 and args.oob) or (args.day0 or args.oob):
 # Print the task title
 task_title('CML2 Lab Builder Recap')
 
+print_colored('Lab Timer:\n', 'green', 'underline')
+
 # Calculate lab build timer and prepare for a nice output
 lab_total_running_time = lab_stop_time - lab_start_time
 lab_minutes, lab_seconds = divmod(lab_total_running_time, 60)
@@ -1200,7 +1294,7 @@ lab_hours, lab_minutes = divmod(lab_minutes, 60)
 # Print the total CML2 lab build time
 sys.stdout.write(
     '\033[92m'
-    'Total CML2 Lab Build Time: %dm %ds\n'
+    'CML2 Lab Build Time: %dm %ds\n'
     '\033[0m' % (lab_minutes, lab_seconds)
 )
 
@@ -1216,26 +1310,47 @@ if (args.day0 and args.oob) or (args.day0 or args.oob):
     # Print the total pyATS automation time
     sys.stdout.write(
         '\033[92m'
-        'Total pyATS Automation Time: %dm %ds\n\n'
+        'pyATS Automation Time: %dm %ds\n\n'
         '\033[0m' % (pyats_minutes, pyats_seconds)
     )
 
 # Print some details about the created CML2 lab
 print_colored(
     f'\n'
-    f'Title: {lab.title:<22}'
+    f'Title: {lab.title:<19}'
     f'ID: {lab.id:<12}'
-    f'URL: {lab.lab_base_url}\n', 'green'
+    f'URL: {lab.lab_base_url}\n', 'green', 'underline'
 )
-print(json.dumps(lab.details(), sort_keys=True, indent=4))
-print(json.dumps(lab.interfaces(), sort_keys=True, indent=4))
-print(json.dumps(lab.links(), sort_keys=True, indent=4))
 
 # Print some details about each node
 for node in lab.nodes():
     print_colored(
-        f'Node: {node.label:<22}'
+        f'Node: {node.label:<20}'
         f'ID: {node.id:<12}'
         f'State: {node.state:<12}'
-        f'CPU: {node.cpu_usage:}%\n', 'green'
+        f'CPU: {node.cpu_usage:}%', 'green'
     )
+
+print('\n')
+
+# Print some details about the created OOB network
+if args.oob:
+    print_colored('OOB Network: VRF CML2-OOB\n', 'green', 'underline')
+    print_colored(
+        f'Subnet: {str(oob_vlan_subnet):<18}'
+        f'Default-Gateway: {str(oob_vlan_gateway):<16}'
+        f'VLAN-Tag: Vlan{str(oob_vlan_number)}\n', 'green'
+    )
+
+    for host in hosts_dict:
+        # Verify that the host has an OOB ip-address key
+        if 'oob_ip' in hosts_dict[host]['data']:
+            # Create a variable for each hosts OOB ip-address
+            oob_ip = hosts_dict[host]['data']['oob_ip']
+            # Print the node hostname and its OOB ip-address
+            print_colored(
+            f'Node: {str(host):<20}'
+            f'OOB IP-Address: {str(oob_ip)}', 'green'
+            )
+
+    print('\n')

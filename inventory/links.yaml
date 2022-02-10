@@ -17,37 +17,37 @@
 #    interface_b:
 
 link_list:
-  - host_a: nxosv9000
-    interface_a:
-    host_b: nxosv
-    interface_b:
+  - host_a: N9K-01
+    interface_a: Ethernet1/53
+    host_b: N9K-02
+    interface_b: Ethernet1/51
 
-  - host_a: iosvl2
-    interface_a:
-    host_b: iosv
-    interface_b:
+  - host_a: N9K-01
+    interface_a: Ethernet1/54
+    host_b: N9K-02
+    interface_b: Ethernet1/52
 
-  - host_a: iosvl2
-    interface_a:
-    host_b: coreos
-    interface_b:
+  - host_a: N9K-01
+    interface_a: Ethernet1/51
+    host_b: N9K-03
+    interface_b: Ethernet1/53
 
-  - host_a: iosvl2
-    interface_a:
-    host_b: server
-    interface_b:
+  - host_a: N9K-01
+    interface_a: Ethernet1/52
+    host_b: N9K-03
+    interface_b: Ethernet1/54
 
-  - host_a: iosvl2
-    interface_a:
-    host_b: alpine
-    interface_b:
+  - host_a: N9K-02
+    interface_a: Ethernet1/53
+    host_b: N9K-03
+    interface_b: Ethernet1/51
 
-  - host_a: iosxrv
-    interface_a:
-    host_b: iosxrv9000
-    interface_b:
+  - host_a: N9K-02
+    interface_a: Ethernet1/54
+    host_b: N9K-03
+    interface_b: Ethernet1/52
 
-  - host_a: csr1000v
+  - host_a: Alpine
     interface_a:
-    host_b: iosxrv9000
+    host_b: SW-1
     interface_b:
