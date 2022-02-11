@@ -69,9 +69,9 @@ def task_title(title):
     terminal_size = os.get_terminal_size()
     # Get length of the Task heading string
     heading = f"TASK [{title}]"
-    heading_length = (len(heading))
+    heading_length = len(heading)
     # Get a terminal wide asterisk line minus the length of the heading length
-    asterisk_line = ((terminal_size.columns - heading_length) * "*")
+    asterisk_line = (terminal_size.columns - heading_length) * "*"
     # Print the heading followed by the aserisk line to shell
     bold = "\033[1m"
     bold_end = "\033[0m"
@@ -195,9 +195,15 @@ argparser = argparse.ArgumentParser(
     device configurations files."""
 )
 # Add a script parser argument
-argparser.add_argument("--day0", help="Optional: Enable day 0 configuration", required=False)
-argparser.add_argument("--oob", help="Optional: Create an OOB VRF with external connection", required=False)
-argparser.add_argument("--debug", help="Optional: Enable stdout debug print", required=False)
+argparser.add_argument(
+    "--day0", help="Optional: Enable day 0 configuration", required=False
+)
+argparser.add_argument(
+    "--oob", help="Optional: Create an OOB VRF with external connection", required=False
+)
+argparser.add_argument(
+    "--debug", help="Optional: Enable stdout debug print", required=False
+)
 
 # Parse the script arguments
 args = argparser.parse_args()
@@ -252,12 +258,7 @@ except KeyError as err:
 
 try:
     # Connect to the CML2 server
-    cml = ClientLibrary(
-        cml_server,
-        cml_user,
-        cml_password,
-        ssl_verify=False
-        )
+    cml = ClientLibrary(cml_server, cml_user, cml_password, ssl_verify=False)
 
     # Create the CML2 lab
     lab = cml.create_lab()
@@ -279,7 +280,13 @@ task_title(f"Setup CML2 Lab ID {lab.id}")
 if args.oob:
     # Specify the supported node platform for the OOB network
     oob_supported_nodes = [
-        "nxosv9000", "nxosv", "iosvl2", "iosv", "csr1000v", "iosxrv", "iosxrv9000"
+        "nxosv9000",
+        "nxosv",
+        "iosvl2",
+        "iosv",
+        "csr1000v",
+        "iosxrv",
+        "iosxrv9000",
     ]
 
     # Add an unmanaged switch for OOB access to the topology
@@ -311,9 +318,18 @@ try:
 
         # Platforms that start with the interface 0; no mgmt interface
         node_start_interface_0 = [
-            "server", "unmanaged_switch", "alpine", "trex", "wan_emulator",
-            "coreos", "desktop", "ubuntu", "iosvl2", "iosv", "csr1000v",
-            "external_connector"
+            "server",
+            "unmanaged_switch",
+            "alpine",
+            "trex",
+            "wan_emulator",
+            "coreos",
+            "desktop",
+            "ubuntu",
+            "iosvl2",
+            "iosv",
+            "csr1000v",
+            "external_connector",
         ]
 
         # Platforms that start with the interface 1; interface 0 is mgmt
@@ -348,7 +364,7 @@ try:
             hosts_dict[host]["data"]["cml_label"],
             hosts_dict[host]["data"]["cml_platform"],
             hosts_dict[host]["data"]["cml_position"][0],
-            hosts_dict[host]["data"]["cml_position"][1]
+            hosts_dict[host]["data"]["cml_position"][1],
         )
 
         # Print the result to stdout
@@ -356,7 +372,9 @@ try:
 
         # Uncomment for details. Dump the modified dictionary to stdout
         if args.debug:
-            task_debug(json.dumps(hosts_dict[host]["data"], sort_keys=True, indent=4), host)
+            task_debug(
+                json.dumps(hosts_dict[host]["data"], sort_keys=True, indent=4), host
+            )
 
 except HTTPError as err:
     # Print the result to stdout
@@ -368,7 +386,7 @@ except HTTPError as err:
 if args.oob:
     # Insert a dictionary with the link between the external connector and the
     # unmanaged switch into to link_dict dictionary as the first element
-    ext_conn_link = {"host_a" : external_connector, "host_b" : unmanaged_switch}
+    ext_conn_link = {"host_a": external_connector, "host_b": unmanaged_switch}
     link_dict["link_list"].insert(0, ext_conn_link)
 
     for host in hosts_dict:
@@ -383,7 +401,7 @@ if args.oob:
         # node to the unmanaged switch but not the unmanaged switch to itself
         if host != unmanaged_switch:
             # Create a dictionary with the link for each host to the unmanaged switch
-            oob_link = {"host_a" : host, "host_b" : unmanaged_switch}
+            oob_link = {"host_a": host, "host_b": unmanaged_switch}
 
             # Insert the dictionary to the list of links as the first element
             # The first links are the OOB links followed by the regular node links
@@ -404,7 +422,9 @@ try:
             if host == [link][0]["host_a"]:
                 # Create an interface on both nodes and specify the slot number to start
                 # With this the mgmt0 interface won"t be used as the first interface
-                node_a_i1 = lab.create_interface(node_a, globals()[host.replace("-", "")])
+                node_a_i1 = lab.create_interface(
+                    node_a, globals()[host.replace("-", "")]
+                )
 
                 # Increase the host specific interface counter
                 globals()[host.replace("-", "")] += 1
@@ -413,7 +433,9 @@ try:
             if host == [link][0]["host_b"]:
                 # Create an interface on both nodes and specify to start with slot 1
                 # With this the mgmt0 interface won"t be used as the first interface
-                node_b_i1 = lab.create_interface(node_b, globals()[host.replace("-", "")])
+                node_b_i1 = lab.create_interface(
+                    node_b, globals()[host.replace("-", "")]
+                )
 
                 # Increase the host specific interface counter
                 globals()[host.replace("-", "")] += 1
@@ -433,7 +455,10 @@ try:
 
         # Uncomment for details. Dump the modified dictionary to stdout
         if args.debug:
-            task_debug(json.dumps(link, sort_keys=True, indent=4), f"{node_a.label} <-> {node_b.label}")
+            task_debug(
+                json.dumps(link, sort_keys=True, indent=4),
+                f"{node_a.label} <-> {node_b.label}",
+            )
 
 except exceptions.NodeNotFound as err:
     # Print the result to stdout
@@ -460,13 +485,15 @@ for cml_link in lab.links():
 
             # Print the result to stdout
             task_ok(
-                "Added dynamic CML2 link details",
-                f"{node_a.label} <-> {node_b.label}"
+                "Added dynamic CML2 link details", f"{node_a.label} <-> {node_b.label}"
             )
 
             # Uncomment for details. Dump the modified dictionary to stdout
             if args.debug:
-                task_debug(json.dumps(link, sort_keys=True, indent=4), f"{node_a.label} <-> {node_b.label}")
+                task_debug(
+                    json.dumps(link, sort_keys=True, indent=4),
+                    f"{node_a.label} <-> {node_b.label}",
+                )
 
 # Dictionary Clean-up to continue the script properly for all argument variations
 if args.oob:
@@ -474,10 +501,18 @@ if args.oob:
     oob_link_dict = link_dict.copy()
 
     # List comprehension to have only the OOB links in the dictionary
-    oob_link_dict["link_list"] = [i for i in oob_link_dict["link_list"] if not ((i["host_b"] or i["host_b"]) != unmanaged_switch)]
+    oob_link_dict["link_list"] = [
+        i
+        for i in oob_link_dict["link_list"]
+        if not ((i["host_b"] or i["host_b"]) != unmanaged_switch)
+    ]
 
     # Clean-Up link_dict dictionary and remove all OOB network links
-    link_dict["link_list"] = [i for i in link_dict["link_list"] if not ((i["host_a"] and i["host_b"]) == unmanaged_switch)]
+    link_dict["link_list"] = [
+        i
+        for i in link_dict["link_list"]
+        if not ((i["host_a"] and i["host_b"]) == unmanaged_switch)
+    ]
 
     # Delete the unmanaged switch and the external connector from the hosts_dict
     del hosts_dict["SW-OOB"]
@@ -551,7 +586,7 @@ if args.day0:
                 parse,
                 r"^enable secret",
                 r"secret.*$",
-                r"secret 0 ciscomodelinglabs4ever!"
+                r"secret 0 ciscomodelinglabs4ever!",
             )
             if len(ios_changed_enable_secret) != 0:
                 all_general_changes.append(ios_changed_enable_secret)
@@ -561,7 +596,7 @@ if args.day0:
                 parse,
                 r"^enable password",
                 r"password.*$",
-                r"secret 0 ciscomodelinglabs4ever!"
+                r"secret 0 ciscomodelinglabs4ever!",
             )
             if len(ios_changed_enable_pw) != 0:
                 all_general_changes.append(ios_changed_enable_pw)
@@ -571,7 +606,9 @@ if args.day0:
 
             # Uncomment for details. Dump the modified dictionary to stdout
             if args.debug:
-                task_debug(json.dumps(all_general_changes, sort_keys=True, indent=4), host)
+                task_debug(
+                    json.dumps(all_general_changes, sort_keys=True, indent=4), host
+                )
 
             # 2. Clean-up not needed interfaces for the cml lab
 
@@ -586,13 +623,15 @@ if args.day0:
                     interface_a = [link][0]["interface_a"]
 
                     # Find interfaces that match exactly to the value from the link_list dict
-                    for block in parse.find_objects(fr"^interface[\s]{interface_a}$"):
+                    for block in parse.find_objects(rf"^interface[\s]{interface_a}$"):
                         all_inventory_interfaces.append(block.text)
                     # Commit changes to the parser
                     parse.commit()
 
                     # Find sub-interfaces that match to the value from the link_list dict
-                    for block in parse.find_objects(fr"^interface[\s]{interface_a}(\.\d+)$"):
+                    for block in parse.find_objects(
+                        rf"^interface[\s]{interface_a}(\.\d+)$"
+                    ):
                         all_inventory_interfaces.append(block.text)
                     # Commit changes to the parser
                     parse.commit()
@@ -602,13 +641,15 @@ if args.day0:
                     interface_b = [link][0]["interface_b"]
 
                     # Find interfaces that match exactly to the value from the link_list dict
-                    for block in parse.find_objects(fr"^interface[\s]{interface_b}$"):
+                    for block in parse.find_objects(rf"^interface[\s]{interface_b}$"):
                         all_inventory_interfaces.append(block.text)
                     # Commit changes to the parser
                     parse.commit()
 
                     # Find sub-interfaces that match to the value from the link_list dict
-                    for block in parse.find_objects(fr"^interface[\s]{interface_b}(\.\d+)$"):
+                    for block in parse.find_objects(
+                        rf"^interface[\s]{interface_b}(\.\d+)$"
+                    ):
                         all_inventory_interfaces.append(block.text)
                     # Commit changes to the parser
                     parse.commit()
@@ -618,7 +659,9 @@ if args.day0:
 
             # Uncomment for details. Dump the modified dictionary to stdout
             if args.debug:
-                task_debug(json.dumps(all_inventory_interfaces, sort_keys=True, indent=4), host)
+                task_debug(
+                    json.dumps(all_inventory_interfaces, sort_keys=True, indent=4), host
+                )
 
             # Delete all interfaces and sub-interfaces which are not needed in the
             # configuration with help of the all_inventory_interfaces list
@@ -646,7 +689,9 @@ if args.day0:
 
             # Uncomment for details. Dump the modified dictionary to stdout
             if args.debug:
-                task_debug(json.dumps(all_deleted_interfaces, sort_keys=True, indent=4), host)
+                task_debug(
+                    json.dumps(all_deleted_interfaces, sort_keys=True, indent=4), host
+                )
 
             # 3. Prepare interfaces to match the dynamically generated interfaces from CML2
 
@@ -668,7 +713,7 @@ if args.day0:
                     changed_interfaces_host_a = parse.replace_lines(
                         f"interface {interface_a}",
                         f"interface {cml_interface_a}",
-                        exactmatch=False
+                        exactmatch=False,
                     )
                     all_changed_interfaces.extend(changed_interfaces_host_a)
                     # Commit changes to the parser
@@ -685,18 +730,23 @@ if args.day0:
                     changed_interfaces_host_b = parse.replace_lines(
                         f"interface {interface_b}",
                         f"interface {cml_interface_b}",
-                        exactmatch=False
+                        exactmatch=False,
                     )
                     all_changed_interfaces.extend(changed_interfaces_host_b)
                     # Commit changes to the parser
                     parse.commit()
 
             # Print the result to stdout
-            task_ok("Modified all needed interfaces to match the dynamic CML2 interfaces", host)
+            task_ok(
+                "Modified all needed interfaces to match the dynamic CML2 interfaces",
+                host,
+            )
 
             # Uncomment for details. Dump the modified dictionary to stdout
             if args.debug:
-                task_debug(json.dumps(all_changed_interfaces, sort_keys=True, indent=4), host)
+                task_debug(
+                    json.dumps(all_changed_interfaces, sort_keys=True, indent=4), host
+                )
 
             # Apply further interface modifications here:
 
@@ -705,7 +755,9 @@ if args.day0:
 
             if not args.oob:
                 # Print the result to stdout
-                task_ok(f"Saved temporary node configuration file config/cml2_{host}", host)
+                task_ok(
+                    f"Saved temporary node configuration file config/cml2_{host}", host
+                )
 
     except FileNotFoundError as err:
         # Print the result to stdout
@@ -726,7 +778,9 @@ if args.oob:
 
     else:
         # Print the result to stdout
-        task_failed(f"OOB vlan number {oob_vlan_number} is not between 1 and 4094", "CML2")
+        task_failed(
+            f"OOB vlan number {oob_vlan_number} is not between 1 and 4094", "CML2"
+        )
         remove_lab(lab)
         sys.exit()
 
@@ -757,7 +811,10 @@ if args.oob:
 
     else:
         # Print the result to stdout
-        task_failed(f"Default-gateway {oob_vlan_gateway} is not in OOB vlan {oob_vlan_subnet}", "CML2")
+        task_failed(
+            f"Default-gateway {oob_vlan_gateway} is not in OOB vlan {oob_vlan_subnet}",
+            "CML2",
+        )
         remove_lab(lab)
         sys.exit()
 
@@ -770,7 +827,9 @@ if args.oob:
 
             # Continue with next host, if node plarform is not implemented for the OOB build
             if node_platform not in oob_supported_nodes:
-                task_failed(f"CML2 platform {node_platform} not implemented for OOB build", host)
+                task_failed(
+                    f"CML2 platform {node_platform} not implemented for OOB build", host
+                )
                 continue
 
             # If the host configuration file not exists
@@ -779,7 +838,9 @@ if args.oob:
                 open(f"config/cml2_{host}", "a", encoding="utf-8").close()
 
                 # Print the result to stdout
-                task_ok(f"Created empty node configuration file config/cml2_{host}", host)
+                task_ok(
+                    f"Created empty node configuration file config/cml2_{host}", host
+                )
 
             # Search the first free ip-address to assign to the node
             # Add the first free ip-address to the list of all_oob_ip_adresses
@@ -810,7 +871,10 @@ if args.oob:
                     break
 
             # Print the result to stdout
-            task_ok("OOB vlan, ip-address, interface and platform identification completed", host)
+            task_ok(
+                "OOB vlan, ip-address, interface and platform identification completed",
+                host,
+            )
 
             # Create the CiscoConfParse object
             parse = CiscoConfParse(f"config/cml2_{host}")
@@ -858,7 +922,7 @@ if args.oob:
                     " no shutdown",
                     "!",
                     f"ip route 0.0.0.0 0.0.0.0 {oob_vlan_gateway} vrf CML2-OOB",
-                    "!"
+                    "!",
                 ]
 
             # OOB configuration for CML2 platform iosvl2
@@ -911,7 +975,7 @@ if args.oob:
                     " no shutdown",
                     "!",
                     f"ip route vrf CML2-OOB 0.0.0.0 0.0.0.0 {oob_vlan_gateway}",
-                    "!"
+                    "!",
                 ]
 
             # OOB configuration for CML2 platform iosxrv and iosxrv9000
@@ -932,7 +996,7 @@ if args.oob:
                     f" ipv4 address {oob_ip} {oob_vlan_subnet.netmask}",
                     " no shutdown",
                     "!",
-                    f"router static vrf CML2-OOB address-family ipv4 unicast 0.0.0.0/0 {oob_vlan_gateway}"
+                    f"router static vrf CML2-OOB address-family ipv4 unicast 0.0.0.0/0 {oob_vlan_gateway}",
                 ]
 
             # Loop over the list of configuration lines and apply it to the parser
@@ -1014,7 +1078,9 @@ if (args.day0 and args.oob) or (args.day0 or args.oob):
             os.remove(f"config/cml2_{host}")
 
             # Print the result to stdout
-            task_ok(f"Deleted temporary node configuration file config/cml2_{host}", host)
+            task_ok(
+                f"Deleted temporary node configuration file config/cml2_{host}", host
+            )
 
     except FileNotFoundError as err:
         # Print the result to stdout
@@ -1031,9 +1097,8 @@ try:
     sys.stdout.write("\033[92m")
 
     with alive_bar(
-            title=f"Lab ID {lab.id} is starting ...",
-            spinner="waves2",
-            unknown="waves2") as bar:
+        title=f"Lab ID {lab.id} is starting ...", spinner="waves2", unknown="waves2"
+    ) as bar:
         lab.start()
 
     # Set stdout print back to default
@@ -1066,37 +1131,57 @@ if (args.day0 and args.oob) or (args.day0 or args.oob):
     task_ok("Generated temporary pyATS testbed on CML2 server", "CML2")
 
     # Write the generated pyATS testbed to a temporary file
-    with open(f"inventory/tmp_pyats_testbed_{lab.id}.yaml", "w", encoding="utf-8") as stream:
+    with open(
+        f"inventory/tmp_pyats_testbed_{lab.id}.yaml", "w", encoding="utf-8"
+    ) as stream:
         stream.write(testbed_generated)
 
     # Read the temporary pyATS testbed as yaml into a variable to do modifications
-    with open(f"inventory/tmp_pyats_testbed_{lab.id}.yaml", "r", encoding="utf-8") as stream:
+    with open(
+        f"inventory/tmp_pyats_testbed_{lab.id}.yaml", "r", encoding="utf-8"
+    ) as stream:
         testbed_loaded = yaml.safe_load(stream)
 
     # Print the result to std-out
     task_ok("Loaded temporary pyATS testbed for modifications", "CML2")
 
-    # Change the default terminal server username and password to look for the cml environment variables
-    testbed_loaded["devices"]["terminal_server"]["credentials"]["default"]["username"] = "%ENV{VIRL2_USER}"
-    testbed_loaded["devices"]["terminal_server"]["credentials"]["default"]["password"] = "%ENV{VIRL2_PASS}"
+    # Change the default terminal server username and password to look for
+    # the cml environment variables
+    testbed_loaded["devices"]["terminal_server"]["credentials"]["default"][
+        "username"
+    ] = "%ENV{VIRL2_USER}"
+    testbed_loaded["devices"]["terminal_server"]["credentials"]["default"][
+        "password"
+    ] = "%ENV{VIRL2_PASS}"
 
     # Print the result to std-out
     task_ok("Modified terminal server username and password", "CML2")
 
     # Uncomment for details. Dump the modified dictionary to stdout
     if args.debug:
-        task_debug(json.dumps(testbed_loaded["devices"]["terminal_server"], sort_keys=True, indent=4), "CML2")
+        task_debug(
+            json.dumps(
+                testbed_loaded["devices"]["terminal_server"], sort_keys=True, indent=4
+            ),
+            "CML2",
+        )
 
     # Changes for each node in the testbed
     for node in testbed_loaded["devices"]:
         if "terminal_server" not in node:
             # Change the default credentials
-            testbed_loaded["devices"][node]["credentials"]["default"]["username"] = "cmladmin"
-            testbed_loaded["devices"][node]["credentials"]["default"]["password"] = "ciscomodelinglabs4ever!"
+            testbed_loaded["devices"][node]["credentials"]["default"][
+                "username"
+            ] = "cmladmin"
+            testbed_loaded["devices"][node]["credentials"]["default"][
+                "password"
+            ] = "ciscomodelinglabs4ever!"
 
             if "series" in testbed_loaded["devices"][node]:
                 # Change the key from series to platform as series has been deprecated
-                testbed_loaded["devices"][node]["platform"] = testbed_loaded["devices"][node]["series"]
+                testbed_loaded["devices"][node]["platform"] = testbed_loaded["devices"][
+                    node
+                ]["series"]
                 # Delete the key series
                 del testbed_loaded["devices"][node]["series"]
 
@@ -1105,10 +1190,17 @@ if (args.day0 and args.oob) or (args.day0 or args.oob):
 
             # Uncomment for details. Dump the modified dictionary to stdout
             if args.debug:
-                task_debug(json.dumps(testbed_loaded["devices"][node], sort_keys=True, indent=4), node)
+                task_debug(
+                    json.dumps(
+                        testbed_loaded["devices"][node], sort_keys=True, indent=4
+                    ),
+                    node,
+                )
 
     # Write the modified pyATS testbed to a file
-    with open(f"inventory/pyats_testbed_{lab.id}.yaml", "w", encoding="utf-8") as stream:
+    with open(
+        f"inventory/pyats_testbed_{lab.id}.yaml", "w", encoding="utf-8"
+    ) as stream:
         yaml.dump(testbed_loaded, stream, default_flow_style=False)
 
     # Print the result to std-out
@@ -1159,18 +1251,20 @@ if (args.day0 and args.oob) or (args.day0 or args.oob):
             task_output(
                 "PyATS genie parser - show version",
                 json.dumps(show_version, sort_keys=True, indent=4),
-                host
+                host,
             )
 
             # Verify the OOB ip-addresses are up with show ip interface brief
             if args.oob:
                 # pyATS execute show ip interface brief vrf CML2-OOB
-                show_ip_interface_brief = device.execute("show ip interface brief vrf CML2-OOB")
+                show_ip_interface_brief = device.execute(
+                    "show ip interface brief vrf CML2-OOB"
+                )
                 # Print the result to std-out
                 task_output(
                     "PyATS execute - show ip interface brief vrf CML2-OOB",
                     show_ip_interface_brief,
-                    host
+                    host,
                 )
 
         # If the platform is iosvl2 the oob vlan needs to set to shutdown and again
@@ -1182,7 +1276,7 @@ if (args.day0 and args.oob) or (args.day0 or args.oob):
             task_output(
                 "PyATS genie parser - show version",
                 json.dumps(show_version, sort_keys=True, indent=4),
-                host
+                host,
             )
 
             # Verify the OOB ip-addresses are up with show ip interface brief
@@ -1192,20 +1286,23 @@ if (args.day0 and args.oob) or (args.day0 or args.oob):
                 # Print the result to std-out
                 task_output(
                     "PyATS genie parser - show ip interface brief",
-                    json.dumps(cmd["interface"][f"Vlan{oob_vlan_number}"], sort_keys=True, indent=4),
-                    host
+                    json.dumps(
+                        cmd["interface"][f"Vlan{oob_vlan_number}"],
+                        sort_keys=True,
+                        indent=4,
+                    ),
+                    host,
                 )
 
                 # Set the OOB SVI to shutdown
                 svi_shutdown = device.configure(
-                    f"interface Vlan {oob_vlan_number} \n"
-                    f"shutdown \n"
+                    f"interface Vlan {oob_vlan_number} \n" f"shutdown \n"
                 )
                 # Print the result to std-out
                 task_changed(
                     f"PyATS configure - Shutdown interface vlan {oob_vlan_number}",
                     svi_shutdown,
-                    host
+                    host,
                 )
 
                 # Pause the script for 5 seconds
@@ -1213,22 +1310,25 @@ if (args.day0 and args.oob) or (args.day0 or args.oob):
 
                 # Set the OOB SVI to no shutdown
                 svi_no_shutdown = device.configure(
-                    f"interface Vlan {oob_vlan_number} \n"
-                    f"no shutdown \n"
+                    f"interface Vlan {oob_vlan_number} \n" f"no shutdown \n"
                 )
                 # Print the result to std-out
                 task_changed(
                     f"PyATS configure - No shutdown interface vlan {oob_vlan_number}",
                     svi_no_shutdown,
-                    host
+                    host,
                 )
 
                 cmd = device.parse("show ip interface brief")
                 # Print the result to std-out
                 task_output(
                     "PyATS genie parser - show ip interface brief",
-                    json.dumps(cmd["interface"][f"Vlan{oob_vlan_number}"], sort_keys=True, indent=4),
-                    host
+                    json.dumps(
+                        cmd["interface"][f"Vlan{oob_vlan_number}"],
+                        sort_keys=True,
+                        indent=4,
+                    ),
+                    host,
                 )
 
         # For iosv and csr1000v
@@ -1239,7 +1339,7 @@ if (args.day0 and args.oob) or (args.day0 or args.oob):
             task_output(
                 "PyATS genie parser - show version",
                 json.dumps(show_version, sort_keys=True, indent=4),
-                host
+                host,
             )
 
             # Verify the OOB ip-addresses are up with show ip interface brief
@@ -1250,7 +1350,7 @@ if (args.day0 and args.oob) or (args.day0 or args.oob):
                 task_output(
                     "PyATS genie parser - show ip interface brief",
                     json.dumps(show_ip_interface_brief, sort_keys=True, indent=4),
-                    host
+                    host,
                 )
 
         # For iosxrv and iosxrv9000
@@ -1261,7 +1361,7 @@ if (args.day0 and args.oob) or (args.day0 or args.oob):
             task_output(
                 "PyATS genie parser - show version",
                 json.dumps(show_version, sort_keys=True, indent=4),
-                host
+                host,
             )
 
             # Verify the OOB ip-addresses are up with show ip interface brief
@@ -1272,7 +1372,7 @@ if (args.day0 and args.oob) or (args.day0 or args.oob):
                 task_output(
                     "PyATS genie parser - show ip interface brief",
                     json.dumps(show_ip_interface_brief, sort_keys=True, indent=4),
-                    host
+                    host,
                 )
 
         # Step 5: Disconnect from the device
@@ -1293,9 +1393,7 @@ lab_hours, lab_minutes = divmod(lab_minutes, 60)
 
 # Print the total CML2 lab build time
 sys.stdout.write(
-    "\033[92m"
-    "CML2 Lab Build Time: %dm %ds\n"
-    "\033[0m" % (lab_minutes, lab_seconds)
+    "\033[92m" "CML2 Lab Build Time: %dm %ds\n" "\033[0m" % (lab_minutes, lab_seconds)
 )
 
 if (args.day0 and args.oob) or (args.day0 or args.oob):
@@ -1316,10 +1414,9 @@ if (args.day0 and args.oob) or (args.day0 or args.oob):
 
 # Print some details about the created CML2 lab
 print_colored(
-    f"\n"
-    f"Title: {lab.title:<19}"
-    f"ID: {lab.id:<12}"
-    f"URL: {lab.lab_base_url}\n", "green", "underline"
+    f"\n" f"Title: {lab.title:<19}" f"ID: {lab.id:<12}" f"URL: {lab.lab_base_url}\n",
+    "green",
+    "underline",
 )
 
 # Print some details about each node
@@ -1328,7 +1425,8 @@ for node in lab.nodes():
         f"Node: {node.label:<20}"
         f"ID: {node.id:<12}"
         f"State: {node.state:<12}"
-        f"CPU: {node.cpu_usage:}%", "green"
+        f"CPU: {node.cpu_usage:}%",
+        "green",
     )
 
 print("\n")
@@ -1339,7 +1437,8 @@ if args.oob:
     print_colored(
         f"Subnet: {str(oob_vlan_subnet):<18}"
         f"Default-Gateway: {str(oob_vlan_gateway):<16}"
-        f"VLAN-Tag: Vlan{str(oob_vlan_number)}\n", "green"
+        f"VLAN-Tag: Vlan{str(oob_vlan_number)}\n",
+        "green",
     )
 
     for host in hosts_dict:
@@ -1349,8 +1448,7 @@ if args.oob:
             oob_ip = hosts_dict[host]["data"]["oob_ip"]
             # Print the node hostname and its OOB ip-address
             print_colored(
-            f"Node: {str(host):<20}"
-            f"OOB IP-Address: {str(oob_ip)}", "green"
+                f"Node: {str(host):<20}" f"OOB IP-Address: {str(oob_ip)}", "green"
             )
 
     print("\n")
