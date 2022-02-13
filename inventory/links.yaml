@@ -46,8 +46,3 @@ link_list:
     interface_a: Ethernet1/54
     host_b: N9K-03
     interface_b: Ethernet1/52
-
-  - host_a: Alpine
-    interface_a:
-    host_b: SW-1
-    interface_b:

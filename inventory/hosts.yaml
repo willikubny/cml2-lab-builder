@@ -41,15 +41,3 @@ N9K-03:
     cml_label: N9K-03
     cml_platform: nxosv9000
     cml_position: [0, 150]
-
-SW-1:
-  data:
-    cml_label: SW-1
-    cml_platform: iosvl2
-    cml_position: [0, 300]
-
-Alpine:
-  data:
-    cml_label: Alpine
-    cml_platform: alpine
-    cml_position: [0, 400]

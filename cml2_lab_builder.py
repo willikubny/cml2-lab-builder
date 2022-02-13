@@ -2,9 +2,9 @@
 """
 Creates a CML2 lab with all needed nodes, interfaces and links.
 Optional:
-- Loads configuration files and modifies the interfaces to match the CML2 lab.
+- Loads configuration files and modifies the interfaces to match the CML2 lab
 - Creates a OOB network with external access in bridged mode
-- Creates a pyATS testbed file.
+- Creates a pyATS testbed file with the day0 or the OOB option
 For more information, read the README.md documentation.
 """
 
