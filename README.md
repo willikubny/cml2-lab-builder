@@ -1,3 +1,5 @@
+<img width="950" alt="Screenshot 2022-06-17 at 13 46 17" src="https://user-images.githubusercontent.com/70367776/174292377-0418e83e-c979-4955-ad62-2bc704f4834a.png">
+
 # CML2 Lab Builder
 
 [![published](https://static.production.devnetcloud.com/codeexchange/assets/images/devnet-published.svg)](https://developer.cisco.com/codeexchange/github/repo/willikubny/cml2_lab_builder)
